@@ -1,0 +1,9 @@
+#!/bin/bash
+
+SCRIPT_DIR=$(dirname "$(readlink -f $0)")
+
+pushd ${SCRIPT_DIR} > /dev/null
+bundle exec rake spec
+STATUS=$?
+popd > /dev/null
+exit ${STATUS}
