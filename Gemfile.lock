@@ -8,8 +8,11 @@ GEM
   specs:
     diff-lcs (1.2.5)
     docile (1.1.5)
+    fakeredis (0.5.0)
+      redis (~> 3.0)
     json (2.0.2)
     rake (11.2.2)
+    redis (3.3.1)
     rspec (3.5.0)
       rspec-core (~> 3.5.0)
       rspec-expectations (~> 3.5.0)
@@ -34,6 +37,7 @@ PLATFORMS
 
 DEPENDENCIES
   bundler (~> 1.12)
+  fakeredis (~> 0.5.0)
   rake (~> 11.0)
   rspec (~> 3.0)
   simplecov (~> 0.12.0)
