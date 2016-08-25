@@ -6,7 +6,7 @@ module Xcflushd
     let(:redis) { Redis.new }
     subject { described_class.new(redis) }
 
-    describe '.reports_to_flush' do
+    describe '#reports_to_flush' do
       # Usage values could be ints, but Redis would return strings anyway.
       let(:cached_reports) do
         [{ service_id: 's1',
