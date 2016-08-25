@@ -3,6 +3,7 @@ PATH
   specs:
     xcflushd (0.1.0)
       3scale_client (= 2.6.1)
+      gli (= 2.14.0)
 
 GEM
   remote: https://rubygems.org/
@@ -13,6 +14,7 @@ GEM
     docile (1.1.5)
     fakeredis (0.5.0)
       redis (~> 3.0)
+    gli (2.14.0)
     json (2.0.2)
     mini_portile2 (2.1.0)
     nokogiri (1.6.8)
