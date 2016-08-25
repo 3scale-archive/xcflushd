@@ -23,6 +23,10 @@ module Xcflushd
     # This performs a cleanup of the reports to be flushed.
     # We can decide later whether it is better to leave this responsibility
     # to the caller of the method.
+    #
+    # Returns an array of hashes where each of them has a service_id, an
+    # app_key, and a usage. The usage is another hash where the keys are the
+    # metrics and the values are guaranteed to respond to to_i and to_s.
     def reports_to_flush
       report_keys = report_keys_to_flush
       result = reports(report_keys)
@@ -54,13 +58,10 @@ module Xcflushd
     def reports(report_keys)
       report_keys.map do |report_hash|
         service_id, app_key = report_hash.sub(KEY_TO_FLUSH_PREFIX, '').split(':')
-        metric_usage_pairs = storage.hgetall(report_hash).map do |metric, usage|
-          [metric, usage.to_i] # Redis returns the value as a string
-        end.to_h
 
         { service_id: service_id,
           app_key: app_key,
-          usage: metric_usage_pairs }
+          usage: storage.hgetall(report_hash) }
       end
     end
 
