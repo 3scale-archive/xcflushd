@@ -7,13 +7,14 @@ module Xcflushd
     subject { described_class.new(redis) }
 
     describe '.reports_to_flush' do
+      # Usage values could be ints, but Redis would return strings anyway.
       let(:cached_reports) do
         [{ service_id: 's1',
            app_key: 'a1',
-           usage: { 'm1' => 1, 'm2' => 2 } },
+           usage: { 'm1' => '1', 'm2' => '2' } },
          { service_id: 's2',
            app_key: 'a2',
-           usage: { 'm1' => 10, 'm2' => 20 } }]
+           usage: { 'm1' => '10', 'm2' => '20' } }]
       end
 
       let(:cached_report_keys) do
