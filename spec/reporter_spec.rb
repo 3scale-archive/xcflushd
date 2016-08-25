@@ -13,7 +13,7 @@ module Xcflushd
       let(:threescale_client) { double('ThreeScale::Client') }
       subject { described_class.new(threescale_client) }
 
-      context('when the report is successful') do
+      context 'when the report is successful' do
         let(:report_response) do
           Object.new.tap { |o| o.define_singleton_method(:success?) { true } }
         end
