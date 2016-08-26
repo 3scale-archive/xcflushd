@@ -1,5 +1,5 @@
-require "xcflushd/version"
-
-module Xcflushd
-  # Your code goes here...
-end
+require 'xcflushd/authorizer'
+require 'xcflushd/flusher'
+require 'xcflushd/reporter'
+require 'xcflushd/storage'
+require 'xcflushd/version'
