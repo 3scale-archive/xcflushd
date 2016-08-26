@@ -1,0 +1,59 @@
+#!/usr/bin/env ruby
+require 'gli'
+require 'redis'
+require 'xcflushd/runner'
+
+include GLI::App
+
+program_desc 'XC flush daemon'
+
+version Xcflushd::VERSION
+
+subcommand_option_handling :normal
+arguments :strict
+
+desc 'Starts the daemon'
+arg_name 'Describe arguments to run here'
+command :run do |c|
+  c.desc 'Redis host'
+  c.flag :redis_host
+
+  c.desc 'Redis port'
+  c.flag :redis_port
+
+  c.desc '3scale backend host'
+  c.flag :threescale_host
+
+  c.desc '3scale provider key'
+  c.flag :provider_key
+
+  c.action do |_global_options, options, _args|
+    Xcflushd::Runner.run(options[:threescale_host],
+                         options[:provider_key],
+                         options[:redis_host],
+                         options[:redis_port].to_i)
+  end
+end
+
+pre do |_global, _command, _options, _args|
+  # Pre logic here
+  # Return true to proceed; false to abort and not call the
+  # chosen command
+  # Use skips_pre before a command to skip this block
+  # on that command only
+  true
+end
+
+post do |_global, _command, _options, _args|
+  # Post logic here
+  # Use skips_post before a command to skip this
+  # block on that command only
+end
+
+on_error do |_exception|
+  # Error logic here
+  # return false to skip default error handling
+  true
+end
+
+exit run(ARGV)
