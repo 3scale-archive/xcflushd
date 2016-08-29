@@ -9,14 +9,14 @@ module Xcflushd
 
     describe '#renew_authorizations' do
       let(:service_id) { 'a_service_id' }
-      let(:app_key) { 'an_app_key' }
-      let(:auth_hash_key) { subject.send(:auth_hash_key, service_id, app_key) }
+      let(:user_key) { 'a_user_key' }
+      let(:auth_hash_key) { subject.send(:auth_hash_key, service_id, user_key) }
       let(:metric) { 'a_metric' }
 
       before do
         allow(threescale_client)
             .to receive(:authorize)
-            .with({ service_id: service_id, app_key: app_key })
+            .with({ service_id: service_id, user_key: user_key })
             .and_return(app_report_usages)
       end
 
@@ -27,7 +27,7 @@ module Xcflushd
         end
 
         it 'marks the metric as non-authorized' do
-          subject.renew_authorizations(service_id, app_key)
+          subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
         end
       end
@@ -39,7 +39,7 @@ module Xcflushd
         end
 
         it 'marks the metric as non-authorized' do
-          subject.renew_authorizations(service_id, app_key)
+          subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
         end
       end
@@ -51,7 +51,7 @@ module Xcflushd
         end
 
         it 'marks the metric as non-authorized' do
-          subject.renew_authorizations(service_id, app_key)
+          subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
         end
       end
@@ -63,7 +63,7 @@ module Xcflushd
         end
 
         it 'marks the metric as authorized' do
-          subject.renew_authorizations(service_id, app_key)
+          subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '1'
         end
       end
@@ -89,15 +89,15 @@ module Xcflushd
         end
 
         it 'renews the authorization for all of them' do
-          subject.renew_authorizations(service_id, app_key)
+          subject.renew_authorizations(service_id, user_key)
 
           authorized_metrics.each do |metric|
-            auth_hash_key = subject.send(:auth_hash_key, service_id, app_key)
+            auth_hash_key = subject.send(:auth_hash_key, service_id, user_key)
             expect(redis.hget(auth_hash_key, metric)).to eq '1'
           end
 
           unauthorized_metrics.each do |metric|
-            auth_hash_key = subject.send(:auth_hash_key, service_id, app_key)
+            auth_hash_key = subject.send(:auth_hash_key, service_id, user_key)
             expect(redis.hget(auth_hash_key, metric)).to eq '0'
           end
         end

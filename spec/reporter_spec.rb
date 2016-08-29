@@ -6,7 +6,7 @@ module Xcflushd
     describe '#report' do
       let(:transaction) do
         { service_id: 'a_service_id',
-          app_key: 'an_app_key',
+          user_key: 'a_user_key',
           usage: { 'metric1' => 1, 'metric2' => 2 } }
       end
 

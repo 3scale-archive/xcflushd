@@ -6,12 +6,12 @@ module Xcflushd
       @storage = storage
     end
 
-    def renew_authorizations(service_id, app_key)
-      hash_key = auth_hash_key(service_id, app_key)
+    def renew_authorizations(service_id, user_key)
+      hash_key = auth_hash_key(service_id, user_key)
 
       # We are grouping the reports for clarity. We can change this in the
       # future if it affects performance.
-      app_usage_reports_by_metric(service_id, app_key).each do |metric, limits|
+      app_usage_reports_by_metric(service_id, user_key).each do |metric, limits|
         storage.hset(hash_key, metric, next_hit_auth?(limits) ? '1' : '0')
       end
     end
@@ -20,16 +20,16 @@ module Xcflushd
 
     attr_reader :threescale_client, :storage
 
-    def auth_hash_key(service_id, app_key)
-      "auth:#{service_id}:#{app_key}"
+    def auth_hash_key(service_id, user_key)
+      "auth:#{service_id}:#{user_key}"
     end
 
-    def app_usage_reports(service_id, app_key)
-      threescale_client.authorize(service_id: service_id, app_key: app_key)
+    def app_usage_reports(service_id, user_key)
+      threescale_client.authorize(service_id: service_id, user_key: user_key)
     end
 
-    def app_usage_reports_by_metric(service_id, app_key)
-      app_usage_reports(service_id, app_key).group_by do |report|
+    def app_usage_reports_by_metric(service_id, user_key)
+      app_usage_reports(service_id, user_key).group_by do |report|
         report[:metric]
       end
     end
