@@ -25,7 +25,7 @@ module Xcflushd
     # to the caller of the method.
     #
     # Returns an array of hashes where each of them has a service_id, an
-    # app_key, and a usage. The usage is another hash where the keys are the
+    # user_key, and a usage. The usage is another hash where the keys are the
     # metrics and the values are guaranteed to respond to to_i and to_s.
     def reports_to_flush
       report_keys = report_keys_to_flush
@@ -57,10 +57,10 @@ module Xcflushd
 
     def reports(report_keys)
       report_keys.map do |report_hash|
-        service_id, app_key = report_hash.sub(KEY_TO_FLUSH_PREFIX, '').split(':')
+        service_id, user_key = report_hash.sub(KEY_TO_FLUSH_PREFIX, '').split(':')
 
         { service_id: service_id,
-          app_key: app_key,
+          user_key: user_key,
           usage: storage.hgetall(report_hash) }
       end
     end

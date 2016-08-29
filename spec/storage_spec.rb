@@ -10,16 +10,16 @@ module Xcflushd
       # Usage values could be ints, but Redis would return strings anyway.
       let(:cached_reports) do
         [{ service_id: 's1',
-           app_key: 'a1',
+           user_key: 'a1',
            usage: { 'm1' => '1', 'm2' => '2' } },
          { service_id: 's2',
-           app_key: 'a2',
+           user_key: 'a2',
            usage: { 'm1' => '10', 'm2' => '20' } }]
       end
 
       let(:cached_report_keys) do
         cached_reports.map do |cached_report|
-          report_key(cached_report[:service_id], cached_report[:app_key])
+          report_key(cached_report[:service_id], cached_report[:user_key])
         end
       end
 
@@ -45,7 +45,7 @@ module Xcflushd
 
         # Store the cached reports as hashes where each metric is a field
         cached_reports.each do |cached_report|
-          key = report_key(cached_report[:service_id], cached_report[:app_key])
+          key = report_key(cached_report[:service_id], cached_report[:user_key])
           cached_report[:usage].each do |metric, value|
             redis.hset(key, metric, value)
           end
@@ -86,8 +86,8 @@ module Xcflushd
       end
     end
 
-    def report_key(service_id, app_key)
-      "#{service_id}:#{app_key}"
+    def report_key(service_id, user_key)
+      "#{service_id}:#{user_key}"
     end
   end
 end

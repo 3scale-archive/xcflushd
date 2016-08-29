@@ -36,10 +36,10 @@ module Xcflushd
       describe 'when there are pending reports to flush' do
         let(:pending_reports) do
           [{ service_id: 's1',
-             app_key: 'a1',
+             user_key: 'a1',
              usage: { 'm1' => '1', 'm2' => '2' } },
            { service_id: 's1',
-             app_key: 'a2',
+             user_key: 'a2',
              usage: { 'm1' => '10', 'm2' => '20' } }]
         end
 
@@ -65,7 +65,7 @@ module Xcflushd
           pending_reports.each do |pending_report|
             expect(authorizer)
                 .to have_received(:renew_authorizations)
-                .with(pending_report[:service_id], pending_report[:app_key])
+                .with(pending_report[:service_id], pending_report[:user_key])
           end
         end
       end

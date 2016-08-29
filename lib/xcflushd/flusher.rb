@@ -24,7 +24,7 @@ module Xcflushd
 
     def renew_authorizations(reports)
       reports.each do |report|
-        authorizer.renew_authorizations(report[:service_id], report[:app_key])
+        authorizer.renew_authorizations(report[:service_id], report[:user_key])
       end
     end
 
