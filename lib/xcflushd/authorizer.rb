@@ -25,7 +25,9 @@ module Xcflushd
     end
 
     def app_usage_reports(service_id, user_key)
-      threescale_client.authorize(service_id: service_id, user_key: user_key)
+      threescale_client
+          .authorize(service_id: service_id, user_key: user_key)
+          .usage_reports
     end
 
     def app_usage_reports_by_metric(service_id, user_key)
