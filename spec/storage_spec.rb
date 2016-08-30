@@ -87,7 +87,7 @@ module Xcflushd
     end
 
     def report_key(service_id, user_key)
-      "#{service_id}:#{user_key}"
+      "#{described_class.const_get(:REPORT_KEY_PREFIX)}#{service_id}:#{user_key}"
     end
   end
 end
