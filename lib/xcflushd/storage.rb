@@ -12,6 +12,10 @@ module Xcflushd
     SET_KEYS_FLUSHING_REPORTS = 'flushing_report_keys'.freeze
     private_constant :SET_KEYS_FLUSHING_REPORTS
 
+    # Prefix to identify cached reports
+    REPORT_KEY_PREFIX = 'report:'.freeze
+    private_constant :REPORT_KEY_PREFIX
+
     # Prefix to identify cached reports that are ready to be flushed
     KEY_TO_FLUSH_PREFIX = 'to_flush:'.freeze
     private_constant :KEY_TO_FLUSH_PREFIX
@@ -55,13 +59,17 @@ module Xcflushd
       KEY_TO_FLUSH_PREFIX + report_key
     end
 
-    def reports(report_keys)
-      report_keys.map do |report_hash|
-        service_id, user_key = report_hash.sub(KEY_TO_FLUSH_PREFIX, '').split(':')
+    def service_and_user_key(key_to_flush)
+      key_to_flush.sub("#{KEY_TO_FLUSH_PREFIX}#{REPORT_KEY_PREFIX}", '')
+                  .split(':')
+    end
 
+    def reports(keys_to_flush)
+      keys_to_flush.map do |key_to_flush|
+        service_id, user_key = service_and_user_key(key_to_flush)
         { service_id: service_id,
           user_key: user_key,
-          usage: storage.hgetall(report_hash) }
+          usage: storage.hgetall(key_to_flush) }
       end
     end
 
