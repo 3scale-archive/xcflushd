@@ -30,12 +30,12 @@ module Xcflushd
 
     def app_usage_reports_by_metric(service_id, user_key)
       app_usage_reports(service_id, user_key).group_by do |report|
-        report[:metric]
+        report.metric
       end
     end
 
     def next_hit_auth?(limits)
-      limits.all? { |limit| limit[:current_value] + 1 <= limit[:max_value] }
+      limits.all? { |limit| limit.current_value + 1 <= limit.max_value }
     end
 
   end

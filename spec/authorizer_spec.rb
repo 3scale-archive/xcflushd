@@ -7,6 +7,8 @@ module Xcflushd
     let(:redis) { Redis.new }
     subject { described_class.new(threescale_client, redis) }
 
+    Usage = Struct.new(:metric, :period, :current_value, :max_value)
+
     describe '#renew_authorizations' do
       let(:service_id) { 'a_service_id' }
       let(:user_key) { 'a_user_key' }
@@ -22,8 +24,7 @@ module Xcflushd
 
       context 'when a metric has a usage in any period that is the same as the limit' do
         let(:app_report_usages) do
-          [{ metric: metric, period: 'hour', current_value: 1, max_value: 1 },
-           { metric: metric, period: 'day', current_value: 1, max_value: 2 }]
+          [Usage.new(metric, 'hour', 1, 1), Usage.new(metric, 'day', 1, 2)]
         end
 
         it 'marks the metric as non-authorized' do
@@ -34,8 +35,7 @@ module Xcflushd
 
       context 'when a metric has a usage above the limit in any period' do
         let(:app_report_usages) do
-          [{ metric: metric, period: 'hour', current_value: 2, max_value: 1 },
-           { metric: metric, period: 'day', current_value: 1, max_value: 2 }]
+          [Usage.new(metric, 'hour', 2, 1), Usage.new(metric, 'day', 1, 2)]
         end
 
         it 'marks the metric as non-authorized' do
@@ -46,8 +46,7 @@ module Xcflushd
 
       context 'when a metric is above the limits for all the periods' do
         let(:app_report_usages) do
-          [{ metric: metric, period: 'hour', current_value: 2, max_value: 1 },
-           { metric: metric, period: 'day', current_value: 2, max_value: 1 }]
+          [Usage.new(metric, 'hour', 2, 1), Usage.new(metric, 'day', 2, 1)]
         end
 
         it 'marks the metric as non-authorized' do
@@ -58,8 +57,7 @@ module Xcflushd
 
       context 'when a metric is below the limits for all the periods' do
         let(:app_report_usages) do
-          [{ metric: metric, period: 'hour', current_value: 1, max_value: 2 },
-           { metric: metric, period: 'day', current_value: 1, max_value: 2 }]
+          [Usage.new(metric, 'hour', 1, 2), Usage.new(metric, 'day', 1, 2)]
         end
 
         it 'marks the metric as authorized' do
@@ -73,15 +71,11 @@ module Xcflushd
         let(:unauthorized_metrics) { %w(um1 um2) }
 
         let(:non_exceeded_report_usages) do
-          authorized_metrics.map do |metric|
-            { metric: metric, period: 'hour', current_value: 1, max_value: 2 }
-          end
+          authorized_metrics.map { |metric| Usage.new(metric, 'hour', 1, 2) }
         end
 
         let(:exceeded_report_usages) do
-          unauthorized_metrics.map do |metric|
-            { metric: metric, period: 'hour', current_value: 2, max_value: 1 }
-          end
+          unauthorized_metrics.map { |metric| Usage.new(metric, 'hour', 2, 1) }
         end
 
         let(:app_report_usages) do
