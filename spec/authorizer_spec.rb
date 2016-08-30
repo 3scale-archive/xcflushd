@@ -16,10 +16,15 @@ module Xcflushd
       let(:metric) { 'a_metric' }
 
       before do
+        test_report_usages = app_report_usages
+        authorize_resp = Object.new.tap do |o|
+          o.define_singleton_method(:usage_reports) { test_report_usages }
+        end
+
         allow(threescale_client)
             .to receive(:authorize)
             .with({ service_id: service_id, user_key: user_key })
-            .and_return(app_report_usages)
+            .and_return(authorize_resp)
       end
 
       context 'when a metric has a usage in any period that is the same as the limit' do
