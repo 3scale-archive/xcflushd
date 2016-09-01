@@ -114,12 +114,10 @@ module Xcflushd
           subject.renew_authorizations(service_id, user_key)
 
           authorized_metrics.each do |metric|
-            auth_hash_key = subject.send(:auth_hash_key, service_id, user_key)
             expect(redis.hget(auth_hash_key, metric)).to eq '1'
           end
 
           unauthorized_metrics.each do |metric|
-            auth_hash_key = subject.send(:auth_hash_key, service_id, user_key)
             expect(redis.hget(auth_hash_key, metric)).to eq '0'
           end
         end
