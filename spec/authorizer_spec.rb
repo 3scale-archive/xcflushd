@@ -5,7 +5,10 @@ module Xcflushd
   describe Authorizer do
     let(:threescale_client) { double('ThreeScale::Client') }
     let(:redis) { Redis.new }
-    subject { described_class.new(threescale_client, redis) }
+    let(:auths_valid_min) { 5 }
+    subject do
+      described_class.new(threescale_client, redis, auths_valid_min)
+    end
 
     Usage = Struct.new(:metric, :period, :current_value, :max_value)
 
@@ -36,6 +39,11 @@ module Xcflushd
           subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
         end
+
+        it 'sets a ttl for the hash key of the application in the storage' do
+          subject.renew_authorizations(service_id, user_key)
+          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
+        end
       end
 
       context 'when a metric has a usage above the limit in any period' do
@@ -46,6 +54,11 @@ module Xcflushd
         it 'marks the metric as non-authorized' do
           subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
+        end
+
+        it 'sets a ttl for the hash key of the application in the storage' do
+          subject.renew_authorizations(service_id, user_key)
+          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
         end
       end
 
@@ -58,6 +71,11 @@ module Xcflushd
           subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
         end
+
+        it 'sets a ttl for the hash key of the application in the storage' do
+          subject.renew_authorizations(service_id, user_key)
+          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
+        end
       end
 
       context 'when a metric is below the limits for all the periods' do
@@ -68,6 +86,11 @@ module Xcflushd
         it 'marks the metric as authorized' do
           subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '1'
+        end
+
+        it 'sets a ttl for the hash key of the application in the storage' do
+          subject.renew_authorizations(service_id, user_key)
+          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
         end
       end
 
@@ -99,6 +122,11 @@ module Xcflushd
             auth_hash_key = subject.send(:auth_hash_key, service_id, user_key)
             expect(redis.hget(auth_hash_key, metric)).to eq '0'
           end
+        end
+
+        it 'sets a ttl for the hash key of the application in the storage' do
+          subject.renew_authorizations(service_id, user_key)
+          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
         end
       end
 
