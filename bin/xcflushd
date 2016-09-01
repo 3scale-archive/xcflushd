@@ -27,11 +27,15 @@ command :run do |c|
   c.desc '3scale provider key'
   c.flag :provider_key
 
+  c.desc 'Validity of authorizations (in minutes)'
+  c.flag :auth_valid_minutes
+
   c.action do |_global_options, options, _args|
     Xcflushd::Runner.run(options[:threescale_host],
                          options[:provider_key],
                          options[:redis_host],
-                         options[:redis_port].to_i)
+                         options[:redis_port].to_i,
+                         options[:auth_valid_minutes].to_i)
   end
 end
 
