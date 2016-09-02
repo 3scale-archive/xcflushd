@@ -30,11 +30,7 @@ module Xcflushd
             .and_return(authorize_resp)
       end
 
-      context 'when a metric has a usage in any period that is the same as the limit' do
-        let(:app_report_usages) do
-          [Usage.new(metric, 'hour', 1, 1), Usage.new(metric, 'day', 1, 2)]
-        end
-
+      shared_examples 'app with metric above the usage limit' do
         it 'marks the metric as non-authorized' do
           subject.renew_authorizations(service_id, user_key)
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
@@ -44,6 +40,14 @@ module Xcflushd
           subject.renew_authorizations(service_id, user_key)
           expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
         end
+      end
+
+      context 'when a metric has a usage in any period that is the same as the limit' do
+        let(:app_report_usages) do
+          [Usage.new(metric, 'hour', 1, 1), Usage.new(metric, 'day', 1, 2)]
+        end
+
+        include_examples 'app with metric above the usage limit'
       end
 
       context 'when a metric has a usage above the limit in any period' do
@@ -51,15 +55,7 @@ module Xcflushd
           [Usage.new(metric, 'hour', 2, 1), Usage.new(metric, 'day', 1, 2)]
         end
 
-        it 'marks the metric as non-authorized' do
-          subject.renew_authorizations(service_id, user_key)
-          expect(redis.hget(auth_hash_key, metric)).to eq '0'
-        end
-
-        it 'sets a ttl for the hash key of the application in the storage' do
-          subject.renew_authorizations(service_id, user_key)
-          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
-        end
+        include_examples 'app with metric above the usage limit'
       end
 
       context 'when a metric is above the limits for all the periods' do
@@ -67,15 +63,7 @@ module Xcflushd
           [Usage.new(metric, 'hour', 2, 1), Usage.new(metric, 'day', 2, 1)]
         end
 
-        it 'marks the metric as non-authorized' do
-          subject.renew_authorizations(service_id, user_key)
-          expect(redis.hget(auth_hash_key, metric)).to eq '0'
-        end
-
-        it 'sets a ttl for the hash key of the application in the storage' do
-          subject.renew_authorizations(service_id, user_key)
-          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
-        end
+        include_examples 'app with metric above the usage limit'
       end
 
       context 'when a metric is below the limits for all the periods' do
