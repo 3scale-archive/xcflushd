@@ -30,13 +30,23 @@ command :run do |c|
   c.desc 'Validity of authorizations (in minutes)'
   c.flag :auth_valid_minutes
 
+  c.desc 'Reporting frequency (in minutes)'
+  c.flag :reporting_freq_minutes
+
   c.action do |_global_options, options, _args|
     [:threescale_host,
      :provider_key,
      :redis_host,
      :redis_port,
-     :auth_valid_minutes].each do |opt|
+     :auth_valid_minutes,
+     :reporting_freq_minutes].each do |opt|
       help_now!("#{opt} is required") unless options[opt]
+    end
+
+    if options[:reporting_freq_minutes] >= options[:auth_valid_minutes]
+      exit_now!('reporting_freq_minutes needs to be >= auth_valid_minutes. '\
+                'Otherwise, auths would be renewed without taking into '\
+                'account the new reports.')
     end
 
     Xcflushd::Runner.run(options[:threescale_host],
