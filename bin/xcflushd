@@ -31,6 +31,14 @@ command :run do |c|
   c.flag :auth_valid_minutes
 
   c.action do |_global_options, options, _args|
+    [:threescale_host,
+     :provider_key,
+     :redis_host,
+     :redis_port,
+     :auth_valid_minutes].each do |opt|
+      help_now!("#{opt} is required") unless options[opt]
+    end
+
     Xcflushd::Runner.run(options[:threescale_host],
                          options[:provider_key],
                          options[:redis_host],
