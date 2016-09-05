@@ -14,7 +14,8 @@ module Xcflushd
       subject { described_class.new(threescale_client) }
 
       errors = { bad_params: described_class::ThreeScaleBadParams,
-                 internal: described_class::ThreeScaleInternalError }
+                 internal: described_class::ThreeScaleInternalError,
+                 auth: described_class::ThreeScaleAuthError }
 
       context 'when the report is successful' do
         let(:report_response) do
@@ -71,7 +72,7 @@ module Xcflushd
                 .and_return(report_response)
 
             expect { subject.report(transaction) }
-                .to raise_error errors[:bad_params]
+                .to raise_error errors[:auth]
           end
         end
       end
