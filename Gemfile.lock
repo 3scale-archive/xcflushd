@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     xcflushd (0.1.0)
-      3scale_client (= 2.7.0)
+      3scale_client (= 2.8.0)
       gli (= 2.14.0)
       hiredis (= 0.6.1)
       redis (= 3.3.1)
@@ -10,7 +10,7 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    3scale_client (2.7.0)
+    3scale_client (2.8.0)
       nokogiri
     diff-lcs (1.2.5)
     docile (1.1.5)
