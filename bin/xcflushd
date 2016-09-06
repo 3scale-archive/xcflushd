@@ -43,8 +43,8 @@ command :run do |c|
       help_now!("#{opt} is required") unless options[opt]
     end
 
-    if options[:reporting_freq_minutes] >= options[:auth_valid_minutes]
-      exit_now!('reporting_freq_minutes needs to be >= auth_valid_minutes. '\
+    if options[:reporting_freq_minutes].to_i >= options[:auth_valid_minutes].to_i
+      exit_now!('reporting_freq_minutes needs to be <= auth_valid_minutes. '\
                 'Otherwise, auths would be renewed without taking into '\
                 'account the new reports.')
     end
