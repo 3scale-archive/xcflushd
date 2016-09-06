@@ -31,10 +31,22 @@ module Xcflushd
             .and_return(authorize_resp)
       end
 
-      shared_examples 'app with metric above the usage limit' do
+      shared_examples 'app with non-authorized metric' do
         it 'marks the metric as non-authorized' do
           subject.renew_authorizations(service_id, user_key, reported_metrics)
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
+        end
+
+        it 'sets a ttl for the hash key of the application in the storage' do
+          subject.renew_authorizations(service_id, user_key, reported_metrics)
+          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
+        end
+      end
+
+      shared_examples 'app with authorized metric' do
+        it 'marks the metric as authorized' do
+          subject.renew_authorizations(service_id, user_key, reported_metrics)
+          expect(redis.hget(auth_hash_key, metric)).to eq '1'
         end
 
         it 'sets a ttl for the hash key of the application in the storage' do
@@ -48,7 +60,7 @@ module Xcflushd
           [Usage.new(metric, 'hour', 1, 1), Usage.new(metric, 'day', 1, 2)]
         end
 
-        include_examples 'app with metric above the usage limit'
+        include_examples 'app with non-authorized metric'
       end
 
       context 'when a metric has a usage above the limit in any period' do
@@ -56,7 +68,7 @@ module Xcflushd
           [Usage.new(metric, 'hour', 2, 1), Usage.new(metric, 'day', 1, 2)]
         end
 
-        include_examples 'app with metric above the usage limit'
+        include_examples 'app with non-authorized metric'
       end
 
       context 'when a metric is above the limits for all the periods' do
@@ -64,7 +76,7 @@ module Xcflushd
           [Usage.new(metric, 'hour', 2, 1), Usage.new(metric, 'day', 2, 1)]
         end
 
-        include_examples 'app with metric above the usage limit'
+        include_examples 'app with non-authorized metric'
       end
 
       context 'when a metric is below the limits for all the periods' do
@@ -72,15 +84,7 @@ module Xcflushd
           [Usage.new(metric, 'hour', 1, 2), Usage.new(metric, 'day', 1, 2)]
         end
 
-        it 'marks the metric as authorized' do
-          subject.renew_authorizations(service_id, user_key, reported_metrics)
-          expect(redis.hget(auth_hash_key, metric)).to eq '1'
-        end
-
-        it 'sets a ttl for the hash key of the application in the storage' do
-          subject.renew_authorizations(service_id, user_key, reported_metrics)
-          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
-        end
+        include_examples 'app with authorized metric'
       end
 
       context 'when the app has several limited metrics' do
@@ -119,9 +123,8 @@ module Xcflushd
       end
 
       context 'when there is a non-limited metric that has been reported' do
-        let(:non_limited_metric) { 'a_non_limited_metric' }
-        let(:reported_metrics) { [non_limited_metric] }
-
+        let(:metric) { 'a_non_limited_metric' }
+        let(:reported_metrics) { [metric] }
         let(:app_report_usages) { [] } # Only limited metrics have reports
 
         before do
@@ -129,7 +132,7 @@ module Xcflushd
               .to receive(:authorize)
               .with({ service_id: service_id,
                       user_key: user_key,
-                      usage: { non_limited_metric => 1 } })
+                      usage: { metric => 1 } })
               .and_return(authorize_resp)
         end
 
@@ -138,15 +141,7 @@ module Xcflushd
             Object.new.tap { |o| o.define_singleton_method(:success?) { true } }
           end
 
-          it 'marks the metric as authorized' do
-            subject.renew_authorizations(service_id, user_key, reported_metrics)
-            expect(redis.hget(auth_hash_key, non_limited_metric)).to eq '1'
-          end
-
-          it 'sets a ttl for the hash key of the application in the storage' do
-            subject.renew_authorizations(service_id, user_key, reported_metrics)
-            expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
-          end
+          include_examples 'app with authorized metric'
         end
 
         context 'and the metric is not authorized' do
@@ -154,15 +149,7 @@ module Xcflushd
             Object.new.tap { |o| o.define_singleton_method(:success?) { false } }
           end
 
-          it 'marks the metric as non-authorized' do
-            subject.renew_authorizations(service_id, user_key, reported_metrics)
-            expect(redis.hget(auth_hash_key, non_limited_metric)).to eq '0'
-          end
-
-          it 'sets a ttl for the hash key of the application in the storage' do
-            subject.renew_authorizations(service_id, user_key, reported_metrics)
-            expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
-          end
+          include_examples 'app with non-authorized metric'
         end
       end
     end
