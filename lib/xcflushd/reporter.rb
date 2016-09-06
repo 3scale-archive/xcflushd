@@ -4,14 +4,18 @@ module Xcflushd
   class Reporter
 
     # Exception raised when the 3scale client is not called with the right
-    # params. For example, when an invalid provider key is used or when we do
-    # not send a usage.
+    # params. This happens when there are programming errors.
     ThreeScaleBadParams = Class.new(RuntimeError)
 
     # Exception raised when the 3scale client is called with the right params
     # but it returns a ServerError. Most of the time this means that 3scale is
     # down.
     ThreeScaleInternalError = Class.new(RuntimeError)
+
+    # Exception raised when the 3scale client made the call, but did not
+    # succeed. This happens when the credentials are invalid. For example, when
+    # an invalid provider key is used.
+    ThreeScaleAuthError = Class.new(RuntimeError)
 
     def initialize(threescale_client)
       @threescale_client = threescale_client
@@ -29,7 +33,7 @@ module Xcflushd
         raise ThreeScaleBadParams, e.message
       end
 
-      raise ThreeScaleBadParams, resp.error_message unless resp.success?
+      raise ThreeScaleAuthError, resp.error_message unless resp.success?
       true
     end
 
