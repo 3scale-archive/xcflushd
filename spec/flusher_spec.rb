@@ -65,7 +65,9 @@ module Xcflushd
           pending_reports.each do |pending_report|
             expect(authorizer)
                 .to have_received(:renew_authorizations)
-                .with(pending_report[:service_id], pending_report[:user_key])
+                .with(pending_report[:service_id],
+                      pending_report[:user_key],
+                      pending_report[:usage].keys)
           end
         end
       end
