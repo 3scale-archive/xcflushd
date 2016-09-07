@@ -74,8 +74,8 @@ module Xcflushd
     end
 
     def cleanup(report_keys)
-      storage.del(SET_KEYS_FLUSHING_REPORTS)
-      report_keys.each { |report_key| storage.del(report_key) }
+      keys_to_delete = [SET_KEYS_FLUSHING_REPORTS] + report_keys
+      storage.del(*keys_to_delete)
     end
   end
 
