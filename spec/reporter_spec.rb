@@ -4,11 +4,14 @@ require 'xcflushd/reporter'
 module Xcflushd
   describe Reporter do
     describe '#report' do
+      let(:service_id) { 'a_service_id' }
+
       let(:transaction) do
-        { service_id: 'a_service_id',
-          user_key: 'a_user_key',
+        { user_key: 'a_user_key',
           usage: { 'metric1' => 1, 'metric2' => 2 } }
       end
+
+      let(:application_usage) { transaction.merge(service_id: service_id) }
 
       let(:threescale_client) { double('ThreeScale::Client') }
       subject { described_class.new(threescale_client) }
@@ -25,10 +28,10 @@ module Xcflushd
         it 'returns true' do
           expect(threescale_client)
               .to receive(:report)
-              .with(transaction)
+              .with(transactions: [transaction], service_id: service_id)
               .and_return(report_response)
 
-          expect(subject.report(transaction)).to be true
+          expect(subject.report(application_usage)).to be true
         end
       end
 
@@ -37,10 +40,10 @@ module Xcflushd
           it "raises #{errors[:internal]}" do
             expect(threescale_client)
                 .to receive(:report)
-                .with(transaction)
+                .with(transactions: [transaction], service_id: service_id)
                 .and_raise(ThreeScale::ServerError.new('error_msg'))
 
-            expect { subject.report(transaction) }
+            expect { subject.report(application_usage) }
                 .to raise_error errors[:internal]
           end
         end
@@ -49,10 +52,10 @@ module Xcflushd
           it "raises #{errors[:bad_params]}" do
             expect(threescale_client)
                 .to receive(:report)
-                .with(transaction)
+                .with(transactions: [transaction], service_id: service_id)
                 .and_raise(ArgumentError)
 
-            expect { subject.report(transaction) }
+            expect { subject.report(application_usage) }
                 .to raise_error errors[:bad_params]
           end
         end
@@ -68,10 +71,10 @@ module Xcflushd
           it "raises #{errors[:bad_params]}" do
             expect(threescale_client)
                 .to receive(:report)
-                .with(transaction)
+                .with(transactions: [transaction], service_id: service_id)
                 .and_return(report_response)
 
-            expect { subject.report(transaction) }
+            expect { subject.report(application_usage) }
                 .to raise_error errors[:auth]
           end
         end
