@@ -24,6 +24,9 @@ command :run do |c|
   c.desc '3scale backend host'
   c.flag :threescale_host
 
+  c.desc '3scale backend port'
+  c.flag :threescale_port, default_value: 80
+
   c.desc '3scale provider key'
   c.flag :provider_key
 
@@ -50,6 +53,7 @@ command :run do |c|
     end
 
     Xcflushd::Runner.run(options[:threescale_host],
+                         options[:threescale_port].to_i,
                          options[:provider_key],
                          options[:redis_host],
                          options[:redis_port].to_i,
