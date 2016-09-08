@@ -47,6 +47,19 @@ module Xcflushd
       result
     end
 
+    def renew_auths(service_id, user_key, authorizations, valid_minutes)
+      hash_key = auth_hash_key(service_id, user_key)
+
+      authorizations.each_slice(REDIS_BATCH_KEYS) do |authorizations_slice|
+        authorizations_slice.each do |auth|
+          # auth[0] contains the metric and auth[1] the authorization boolean
+          storage.hset(hash_key, auth[0], auth[1] ? '1' : '0')
+        end
+      end
+
+      set_auth_validity(service_id, user_key, valid_minutes)
+    end
+
     private
 
     attr_reader :storage
@@ -109,6 +122,18 @@ module Xcflushd
     def cleanup(report_keys)
       keys_to_delete = [SET_KEYS_FLUSHING_REPORTS] + report_keys
       keys_to_delete.each_slice(REDIS_BATCH_KEYS) { |keys| storage.del(*keys) }
+    end
+
+    def auth_hash_key(service_id, user_key)
+      "auth:#{service_id}:#{user_key}"
+    end
+
+    def set_auth_validity(service_id, user_key, valid_minutes)
+      # Redis does not allow us to set a TTL for hash key fields. TTLs can only
+      # be applied to the key containing the hash. This is not a problem
+      # because we always renew all the metrics of an application at the same
+      # time.
+      storage.expire(auth_hash_key(service_id, user_key), valid_minutes * 60)
     end
   end
 
