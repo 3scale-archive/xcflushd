@@ -1,3 +1,5 @@
+require 'concurrent'
+
 module Xcflushd
   class Flusher
 
@@ -6,6 +8,10 @@ module Xcflushd
       @authorizer = authorizer
       @storage = storage
       @auth_valid_min = auth_valid_min
+
+      # TODO: tune the pool options.
+      @thread_pool = Concurrent::ThreadPoolExecutor.new(
+          max_threads: Concurrent.processor_count * 4)
     end
 
     # TODO: decide if we want to renew the authorizations every time.
@@ -17,14 +23,20 @@ module Xcflushd
 
     private
 
-    attr_reader :reporter, :authorizer, :storage, :auth_valid_min
+    attr_reader :reporter, :authorizer, :storage, :auth_valid_min, :thread_pool
 
     def reports
       storage.reports_to_flush
     end
 
     def report(reports)
-      reports.each { |report| reporter.report(report) }
+      report_tasks = async_report_tasks(reports)
+      report_tasks.each(&:execute)
+      report_tasks.each do |report_task|
+        # TODO: wait until it is done (report_task.value) and then, if
+        # rejected, treat the exception
+        report_task.value
+      end
     end
 
     def authorizations(reports)
@@ -45,6 +57,14 @@ module Xcflushd
                             authorization[:user_key],
                             authorization[:auths],
                             auth_valid_min)
+      end
+    end
+
+    def async_report_tasks(reports)
+      reports.map do |report|
+        Concurrent::Future.new(executor: thread_pool) do
+          reporter.report(report)
+        end
       end
     end
 
