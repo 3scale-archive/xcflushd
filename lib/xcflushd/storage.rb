@@ -1,7 +1,7 @@
 module Xcflushd
 
-  # TODO: Think about performance and handling errors. For example, some Redis
-  # commands should be executed in a pipeline.
+  # TODO: Think about how to handle errors that occur when Redis is not
+  # accessible.
   class Storage
 
     # Set that contains the keys of the cached reports
@@ -19,6 +19,15 @@ module Xcflushd
     # Prefix to identify cached reports that are ready to be flushed
     KEY_TO_FLUSH_PREFIX = 'to_flush:'.freeze
     private_constant :KEY_TO_FLUSH_PREFIX
+
+    # Some Redis operations might block the server for a long time if they need
+    # to operate on big collections of keys or values.
+    # For that reason, when using pipelines, instead of sending all the keys in
+    # a single pipeline, we send them in batches.
+    # If the batch is too big, we might block the server for a long time. If it
+    # is too little, we will waste time in network round-trips to the server.
+    REDIS_BATCH_KEYS = 500
+    private_constant :REDIS_BATCH_KEYS
 
     def initialize(storage)
       @storage = storage
@@ -44,11 +53,16 @@ module Xcflushd
 
     def report_keys_to_flush
       storage.rename(SET_KEYS_CACHED_REPORTS, SET_KEYS_FLUSHING_REPORTS)
-      flushing_report_keys.map do |report_key|
-        new_hash_name = name_key_to_flush(report_key)
-        storage.rename(report_key, new_hash_name)
-        new_hash_name
+
+      keys_with_flushing_prefix = flushing_report_keys.map do |key|
+        name_key_to_flush(key)
       end
+
+      # Hash with old names as keys and new ones as values
+      key_names = Hash[flushing_report_keys.zip(keys_with_flushing_prefix)]
+      rename(key_names)
+
+      key_names.values
     end
 
     def flushing_report_keys
@@ -64,18 +78,37 @@ module Xcflushd
                   .split(':')
     end
 
+    # Returns a report (hash with service_id, user_key, and usage) for each of
+    # the keys received.
     def reports(keys_to_flush)
-      keys_to_flush.map do |key_to_flush|
-        service_id, user_key = service_and_user_key(key_to_flush)
-        { service_id: service_id,
-          user_key: user_key,
-          usage: storage.hgetall(key_to_flush) }
+      usages = []
+      keys_to_flush.each_slice(REDIS_BATCH_KEYS) do |keys|
+        usages << storage.pipelined do
+          keys.each { |key| storage.hgetall(key) }
+        end
+      end
+
+      key_usages = Hash[keys_to_flush.zip(usages.flatten)]
+
+      key_usages.map do |key, usage|
+        service_id, user_key = service_and_user_key(key)
+        { service_id: service_id, user_key: user_key, usage: usage }
+      end
+    end
+
+    def rename(keys)
+      keys.each_slice(REDIS_BATCH_KEYS) do |keys_slice|
+        storage.pipelined do
+          keys_slice.each do |old_name, new_name|
+            storage.rename(old_name, new_name)
+          end
+        end
       end
     end
 
     def cleanup(report_keys)
-      storage.del(SET_KEYS_FLUSHING_REPORTS)
-      report_keys.each { |report_key| storage.del(report_key) }
+      keys_to_delete = [SET_KEYS_FLUSHING_REPORTS] + report_keys
+      keys_to_delete.each_slice(REDIS_BATCH_KEYS) { |keys| storage.del(*keys) }
     end
   end
 
