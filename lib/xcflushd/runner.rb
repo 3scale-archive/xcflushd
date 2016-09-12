@@ -1,6 +1,7 @@
 require 'xcflushd'
 require 'redis'
 require '3scale_client'
+require 'xcflushd/3scale_client_ext'
 
 module Xcflushd
   class Runner
