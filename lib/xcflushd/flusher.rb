@@ -40,14 +40,12 @@ module Xcflushd
     end
 
     def authorizations(reports)
-      reports.map do |report|
-        reported_metrics = report[:usage].keys
-        auths = authorizer.authorizations(
-            report[:service_id], report[:user_key], reported_metrics)
-
+      auth_tasks = async_authorization_tasks(reports)
+      auth_tasks.values.each(&:execute)
+      auth_tasks.map do |report, auth_task|
         { service_id: report[:service_id],
           user_key: report[:user_key],
-          auths: auths }
+          auths: auth_task.value }
       end
     end
 
@@ -66,6 +64,25 @@ module Xcflushd
           reporter.report(report)
         end
       end
+    end
+
+    # Returns a Hash. The keys are the reports and the values their associated
+    # async authorization tasks.
+    def async_authorization_tasks(reports)
+      # Each call to authorizer.authorizations might need to contact 3scale
+      # several times. The number of calls equals 1 + number of reported
+      # metrics without limits.
+      # This is probably good enough for now, but in the future we might want
+      # to make sure that we perform concurrent calls to 3scale instead of
+      # authorizer.authorizations.
+      reports.map do |report|
+        task = Concurrent::Future.new(executor: thread_pool) do
+          authorizer.authorizations(report[:service_id],
+                                    report[:user_key],
+                                    report[:usage].keys)
+        end
+        [report, task]
+      end.to_h
     end
 
   end
