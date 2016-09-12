@@ -12,7 +12,8 @@ module Xcflushd
         storage = Storage.new(redis)
         threescale = ThreeScale::Client.new(provider_key: provider_key,
                                             host: threescale_host,
-                                            port: threescale_port)
+                                            port: threescale_port,
+                                            persistent: true)
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)
         flusher = Flusher.new(reporter, authorizer, storage, auth_valid_min)
