@@ -7,7 +7,11 @@ module Xcflushd
     let(:reporter) { double('reporter') }
     let(:authorizer) { double('authorizer') }
     let(:storage) { double('storage') }
-    subject { described_class.new(reporter, authorizer, storage) }
+    let(:auth_valid_min) { 10 }
+
+    subject do
+      described_class.new(reporter, authorizer, storage, auth_valid_min)
+    end
 
     before do
       allow(storage)
@@ -15,7 +19,8 @@ module Xcflushd
           .and_return(pending_reports)
 
       allow(reporter).to receive(:report)
-      allow(authorizer).to receive(:renew_authorizations)
+      allow(authorizer).to receive(:authorizations)
+      allow(storage).to receive(:renew_auths)
     end
 
     describe '#flush' do
@@ -29,18 +34,38 @@ module Xcflushd
 
         it 'does not renew any authorizations' do
           subject.flush
-          expect(authorizer).not_to have_received(:renew_authorizations)
+          expect(storage).not_to have_received(:renew_auths)
         end
       end
 
       describe 'when there are pending reports to flush' do
+        let(:apps) do
+          { app1: { service_id: 's1', user_key: 'uk1' },
+            app2: { service_id: 's2', user_key: 'uk2' } }
+        end
+
+        let(:usages) do
+          { app1: { 'm1' => '1', 'm2' => '2' },
+            app2: { 'm3' => '3', 'm4' => '4' } }
+        end
+
+        let(:authorizations) do
+          { app1: { 'm1' => true, 'm2' => false },
+            app2: { 'm3' => false, 'm4' => true } }
+        end
+
         let(:pending_reports) do
-          [{ service_id: 's1',
-             user_key: 'a1',
-             usage: { 'm1' => '1', 'm2' => '2' } },
-           { service_id: 's1',
-             user_key: 'a2',
-             usage: { 'm1' => '10', 'm2' => '20' } }]
+          apps.map { |app, id| id.merge(usage: usages[app]) }
+        end
+
+        before do
+          # Define the authorizations returned by the authorizer
+          apps.each do |app, id|
+            allow(authorizer)
+                .to receive(:authorizations)
+                .with(id[:service_id], id[:user_key], usages[app].keys)
+                .and_return(authorizations[app])
+            end
         end
 
         it 'reports them' do
@@ -48,7 +73,7 @@ module Xcflushd
 
           expect(reporter)
               .to have_received(:report)
-              .exactly(pending_reports.size).times
+              .exactly(apps.size).times
 
           pending_reports.each do |pending_report|
             expect(reporter).to have_received(:report).with(pending_report)
@@ -58,16 +83,17 @@ module Xcflushd
         it 'renews the authorization for the apps of those reports' do
           subject.flush
 
-          expect(authorizer)
-              .to have_received(:renew_authorizations)
-              .exactly(pending_reports.size).times
+          expect(storage)
+              .to have_received(:renew_auths)
+              .exactly(apps.size).times
 
-          pending_reports.each do |pending_report|
-            expect(authorizer)
-                .to have_received(:renew_authorizations)
-                .with(pending_report[:service_id],
-                      pending_report[:user_key],
-                      pending_report[:usage].keys)
+          apps.each do |app, id|
+            expect(storage)
+                .to have_received(:renew_auths)
+                .with(id[:service_id],
+                      id[:user_key],
+                      authorizations[app],
+                      auth_valid_min)
           end
         end
       end

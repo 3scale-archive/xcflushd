@@ -4,18 +4,13 @@ require 'xcflushd/authorizer'
 module Xcflushd
   describe Authorizer do
     let(:threescale_client) { double('ThreeScale::Client') }
-    let(:redis) { Redis.new }
-    let(:auths_valid_min) { 5 }
-    subject do
-      described_class.new(threescale_client, redis, auths_valid_min)
-    end
+    subject { described_class.new(threescale_client) }
 
     Usage = Struct.new(:metric, :period, :current_value, :max_value)
 
-    describe '#renew_authorizations' do
+    describe '#authorizations' do
       let(:service_id) { 'a_service_id' }
       let(:user_key) { 'a_user_key' }
-      let(:auth_hash_key) { subject.send(:auth_hash_key, service_id, user_key) }
       let(:metric) { 'a_metric' }
       let(:reported_metrics) { [metric] }
 
@@ -32,26 +27,16 @@ module Xcflushd
       end
 
       shared_examples 'app with non-authorized metric' do
-        it 'marks the metric as non-authorized' do
-          subject.renew_authorizations(service_id, user_key, reported_metrics)
-          expect(redis.hget(auth_hash_key, metric)).to eq '0'
-        end
-
-        it 'sets a ttl for the hash key of the application in the storage' do
-          subject.renew_authorizations(service_id, user_key, reported_metrics)
-          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
+        it 'returns the authorization status set to false' do
+          auths = subject.authorizations(service_id, user_key, reported_metrics)
+          expect(auths).to eq({ metric => false })
         end
       end
 
       shared_examples 'app with authorized metric' do
-        it 'marks the metric as authorized' do
-          subject.renew_authorizations(service_id, user_key, reported_metrics)
-          expect(redis.hget(auth_hash_key, metric)).to eq '1'
-        end
-
-        it 'sets a ttl for the hash key of the application in the storage' do
-          subject.renew_authorizations(service_id, user_key, reported_metrics)
-          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
+        it 'returns the authorization status set to true' do
+          auths = subject.authorizations(service_id, user_key, reported_metrics)
+          expect(auths).to eq({ metric => true })
         end
       end
 
@@ -104,21 +89,14 @@ module Xcflushd
           non_exceeded_report_usages + exceeded_report_usages
         end
 
-        it 'renews the authorization for all of them' do
-          subject.renew_authorizations(service_id, user_key, reported_metrics)
+        it 'returns the correct authorization status for all of them' do
+          auths = subject.authorizations(service_id, user_key, reported_metrics)
 
-          authorized_metrics.each do |metric|
-            expect(redis.hget(auth_hash_key, metric)).to eq '1'
-          end
+          expected_auths = {}
+          authorized_metrics.each { |metric| expected_auths[metric] = true }
+          unauthorized_metrics.each { |metric| expected_auths[metric] = false }
 
-          unauthorized_metrics.each do |metric|
-            expect(redis.hget(auth_hash_key, metric)).to eq '0'
-          end
-        end
-
-        it 'sets a ttl for the hash key of the application in the storage' do
-          subject.renew_authorizations(service_id, user_key, reported_metrics)
-          expect(redis.ttl(auth_hash_key)).to be_between(0, auths_valid_min*60)
+          expect(auths).to eq(expected_auths)
         end
       end
 

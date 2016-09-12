@@ -86,6 +86,43 @@ module Xcflushd
       end
     end
 
+    describe '#renew_authorizations' do
+      let(:service_id) { 'a_service_id' }
+      let(:user_key) { 'a_user_key' }
+      let(:auth_hash_key) do
+        subject.send(:auth_hash_key, service_id, user_key)
+      end
+
+      let(:valid_min) { 5 }
+      let(:authorized_metrics) { %w(am1 am2) }
+      let(:non_authorized_metrics) { %w(nam1 nam2) }
+      let(:authorizations) do
+        auths = {}
+        authorized_metrics.each { |metric| auths[metric] = true }
+        non_authorized_metrics.each { |metric| auths[metric] = false }
+        auths
+      end
+
+      it 'renews the authorization of the authorized metrics' do
+        subject.renew_auths(service_id, user_key, authorizations, valid_min)
+        authorized_metrics.each do |metric|
+          expect(redis.hget(auth_hash_key, metric)).to eq '1'
+        end
+      end
+
+      it 'renews the authorization of the non-authorized metrics' do
+        subject.renew_auths(service_id, user_key, authorizations, valid_min)
+        non_authorized_metrics.each do |metric|
+          expect(redis.hget(auth_hash_key, metric)).to eq '0'
+        end
+      end
+
+      it 'sets a TTL for the hash that contains the auths of the application' do
+        subject.renew_auths(service_id, user_key, authorizations, valid_min)
+        expect(redis.ttl(auth_hash_key)).to be_between(0, valid_min*60)
+      end
+    end
+
     def report_key(service_id, user_key)
       "#{described_class.const_get(:REPORT_KEY_PREFIX)}#{service_id}:#{user_key}"
     end

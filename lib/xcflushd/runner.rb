@@ -14,8 +14,8 @@ module Xcflushd
                                             host: threescale_host,
                                             port: threescale_port)
         reporter = Reporter.new(threescale)
-        authorizer = Authorizer.new(threescale, redis, auth_valid_min)
-        flusher = Flusher.new(reporter, authorizer, storage)
+        authorizer = Authorizer.new(threescale)
+        flusher = Flusher.new(reporter, authorizer, storage, auth_valid_min)
 
         flusher.flush
       end
