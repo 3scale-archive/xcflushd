@@ -1,3 +1,4 @@
+require 'xcflushd/logger'
 require 'xcflushd/authorizer'
 require 'xcflushd/flusher'
 require 'xcflushd/reporter'
