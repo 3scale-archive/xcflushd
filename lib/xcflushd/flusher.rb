@@ -3,11 +3,12 @@ require 'concurrent'
 module Xcflushd
   class Flusher
 
-    def initialize(reporter, authorizer, storage, auth_valid_min)
+    def initialize(reporter, authorizer, storage, auth_valid_min, error_handler)
       @reporter = reporter
       @authorizer = authorizer
       @storage = storage
       @auth_valid_min = auth_valid_min
+      @error_handler = error_handler
 
       # TODO: tune the pool options.
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
@@ -23,7 +24,8 @@ module Xcflushd
 
     private
 
-    attr_reader :reporter, :authorizer, :storage, :auth_valid_min, :thread_pool
+    attr_reader :reporter, :authorizer, :storage, :auth_valid_min,
+                :error_handler, :thread_pool
 
     def reports
       storage.reports_to_flush
@@ -31,22 +33,37 @@ module Xcflushd
 
     def report(reports)
       report_tasks = async_report_tasks(reports)
-      report_tasks.each(&:execute)
-      report_tasks.each do |report_task|
-        # TODO: wait until it is done (report_task.value) and then, if
-        # rejected, treat the exception
-        report_task.value
-      end
+      report_tasks.values.each(&:execute)
+      report_tasks.values.each(&:value) # blocks until all finish
+
+      failed = report_tasks.select { |_report, task| task.rejected? }
+                           .map { |report, task| [report, task.reason] }
+                           .to_h
+
+      error_handler.handle_report_errors(failed) unless failed.empty?
     end
 
     def authorizations(reports)
       auth_tasks = async_authorization_tasks(reports)
       auth_tasks.values.each(&:execute)
-      auth_tasks.map do |report, auth_task|
-        { service_id: report[:service_id],
-          user_key: report[:user_key],
-          auths: auth_task.value }
+
+      auths = []
+      failed = {}
+      auth_tasks.each do |report, auth_task|
+        auth = auth_task.value # blocks until finished
+
+        if auth_task.fulfilled?
+          auths << { service_id: report[:service_id],
+                     user_key: report[:user_key],
+                     auths: auth }
+        else
+          failed[report] = auth_task.reason
+        end
       end
+
+      error_handler.handle_auth_errors(failed) unless failed.empty?
+
+      auths
     end
 
     def renew(authorizations)
@@ -60,10 +77,11 @@ module Xcflushd
 
     def async_report_tasks(reports)
       reports.map do |report|
-        Concurrent::Future.new(executor: thread_pool) do
+        task = Concurrent::Future.new(executor: thread_pool) do
           reporter.report(report)
         end
-      end
+        [report, task]
+      end.to_h
     end
 
     # Returns a Hash. The keys are the reports and the values their associated
