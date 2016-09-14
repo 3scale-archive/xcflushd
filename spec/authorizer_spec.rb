@@ -8,6 +8,8 @@ module Xcflushd
 
     Usage = Struct.new(:metric, :period, :current_value, :max_value)
 
+    threescale_internal_error = described_class::ThreeScaleInternalError
+
     describe '#authorizations' do
       let(:service_id) { 'a_service_id' }
       let(:user_key) { 'a_user_key' }
@@ -128,6 +130,48 @@ module Xcflushd
           end
 
           include_examples 'app with non-authorized metric'
+        end
+      end
+
+      context 'when authorizing against 3scale fails' do
+        context 'while authorizing the limited metrics' do
+          let(:app_report_usages) { [] } # Does not matter. It's going to raise
+
+          before do
+            allow(threescale_client)
+                .to receive(:authorize)
+                .with({ service_id: service_id, user_key: user_key })
+                .and_raise(ThreeScale::ServerError.new('error_msg'))
+          end
+
+          it "raises #{threescale_internal_error}" do
+            expect { subject.authorizations(service_id, user_key, reported_metrics) }
+                .to raise_error threescale_internal_error
+          end
+        end
+
+        context 'while authorizing a non-limited metric' do
+          let(:metric) { 'a_non_limited_metric' }
+          let(:reported_metrics) { [metric] }
+
+          # No usages because there is only 1 metric, and it is not limited
+          let(:app_report_usages) { [] }
+
+          before do
+            # Raise only when authorizing the non-limited metric. This case can
+            # be distinguished because it sends a predicted usage to the call.
+            allow(threescale_client)
+                .to receive(:authorize)
+                .with({ service_id: service_id,
+                        user_key: user_key,
+                        usage: { metric => 1 } })
+                .and_raise(ThreeScale::ServerError.new('error_msg'))
+          end
+
+          it "raises #{threescale_internal_error}" do
+            expect { subject.authorizations(service_id, user_key, reported_metrics) }
+                .to raise_error threescale_internal_error
+          end
         end
       end
     end
