@@ -17,7 +17,9 @@ module Xcflushd
                                             persistent: true)
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)
-        flusher = Flusher.new(reporter, authorizer, storage, auth_valid_min)
+        flusher_error_handler = FlusherErrorHandler.new(Logger.new(STDOUT))
+        flusher = Flusher.new(reporter, authorizer, storage, auth_valid_min,
+                              flusher_error_handler)
 
         flusher.flush
       end
