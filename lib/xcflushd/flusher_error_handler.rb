@@ -17,13 +17,15 @@ module Xcflushd
     TEMP_ERRORS = (REPORTER_ERRORS[:temp] + AUTHORIZER_ERRORS[:temp]).freeze
     private_constant :TEMP_ERRORS
 
-    def initialize(logger)
+    def initialize(logger, storage)
       @logger = logger
+      @storage = storage
     end
 
     # @param failed_reports [Hash<Report, Exception>]
     def handle_report_errors(failed_reports)
       failed_reports.values.each { |exception| log(exception) }
+      storage.report(failed_reports.keys)
     end
 
     # @param failed_auths [Hash<Auth, Exception>]
@@ -33,7 +35,7 @@ module Xcflushd
 
     private
 
-    attr_reader :logger
+    attr_reader :logger, :storage
 
     # For exceptions that are likely to require the user intervention, we log
     # errors. For example, when the report could not be made because the 3scale
