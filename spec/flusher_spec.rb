@@ -4,10 +4,14 @@ require 'xcflushd/reporter'
 
 module Xcflushd
   describe Flusher do
-    let(:reporter) { double('reporter') }
-    let(:authorizer) { double('authorizer') }
-    let(:storage) { double('storage') }
+    let(:reporter) { double('reporter', report: true) }
+    let(:authorizer) { double('authorizer', authorizations: true) }
     let(:auth_valid_min) { 10 }
+
+    let(:storage) do
+      double('storage', renew_auths: true, reports_to_flush: pending_reports)
+    end
+
     let(:error_handler) do
       double('error_handler',
              :handle_report_errors => true,
@@ -16,16 +20,6 @@ module Xcflushd
 
     subject do
       described_class.new(reporter, authorizer, storage, auth_valid_min, error_handler)
-    end
-
-    before do
-      allow(storage)
-          .to receive(:reports_to_flush)
-          .and_return(pending_reports)
-
-      allow(reporter).to receive(:report)
-      allow(authorizer).to receive(:authorizations)
-      allow(storage).to receive(:renew_auths)
     end
 
     describe '#flush' do
