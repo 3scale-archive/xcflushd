@@ -6,6 +6,10 @@ module Xcflushd
     let(:redis) { Redis.new }
     subject { described_class.new(redis) }
 
+    let(:set_keys_cached_reports) do
+      described_class.const_get(:SET_KEYS_CACHED_REPORTS)
+    end
+
     describe '#reports_to_flush' do
       # Usage values could be ints, but Redis would return strings anyway.
       let(:cached_reports) do
@@ -27,10 +31,6 @@ module Xcflushd
         cached_report_keys.map do |key|
           subject.send(:name_key_to_flush , key)
         end
-      end
-
-      let(:set_keys_cached_reports) do
-        described_class.const_get(:SET_KEYS_CACHED_REPORTS)
       end
 
       let(:set_keys_flushing_reports) do
@@ -123,8 +123,63 @@ module Xcflushd
       end
     end
 
-    def report_key(service_id, user_key)
-      "#{described_class.const_get(:REPORT_KEY_PREFIX)}#{service_id}:#{user_key}"
+    describe '#report' do
+      let(:apps) do
+        { app1: { service_id: 's1', user_key: 'uk1'},
+          app2: { service_id: 's2', user_key: 'uk2'} }
+      end
+
+      let(:reported_usages) do
+        { app1: { 'm1' => '1', 'm2' => '2' },
+          app2: { 'm3' => '3', 'm4' => '4' }}
+      end
+
+      let(:current_usages) do
+        { app1: { 'm1' => '10', 'm2' => '20' },
+          app2: { 'm3' => '30', 'm4' => '40' }}
+      end
+
+      let(:reports) do
+        apps.map { |app, id| id.merge(usage: reported_usages[app]) }
+      end
+
+      let(:report_keys) do
+        reports.map do |report|
+          report_key(report[:service_id], report[:user_key])
+        end
+      end
+
+      before do
+        # Set the current usage
+        apps.each do |app, id|
+          key = report_key(id[:service_id], id[:user_key])
+          current_usages[app].each do |metric, usage|
+            redis.hset(key, metric, usage)
+          end
+        end
+      end
+
+      it 'increases the usage of all the metrics reported' do
+        subject.report(reports)
+        apps.each do |app, id|
+          key = report_key(id[:service_id], id[:user_key])
+          reported_usages[app].each do |metric, usage|
+            expect(redis.hget(key, metric))
+                .to eq((usage.to_i + current_usages[app][metric].to_i).to_s)
+          end
+        end
+      end
+
+      it 'adds the affected cached report keys to the set of cached reports' do
+        subject.report(reports)
+        expect(redis.smembers(set_keys_cached_reports))
+            .to include(*report_keys)
+      end
     end
+
+    def report_key(service_id, user_key)
+      subject.send(:report_hash_key, service_id, user_key)
+    end
+
   end
 end

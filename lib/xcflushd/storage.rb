@@ -60,6 +60,13 @@ module Xcflushd
       set_auth_validity(service_id, user_key, valid_minutes)
     end
 
+    def report(reports)
+      reports.each do |report|
+        increase_usage(report)
+        add_to_set_keys_cached_reports(report)
+      end
+    end
+
     private
 
     attr_reader :storage
@@ -128,6 +135,10 @@ module Xcflushd
       "auth:#{service_id}:#{user_key}"
     end
 
+    def report_hash_key(service_id, user_key)
+      "#{REPORT_KEY_PREFIX}#{service_id}:#{user_key}"
+    end
+
     def set_auth_validity(service_id, user_key, valid_minutes)
       # Redis does not allow us to set a TTL for hash key fields. TTLs can only
       # be applied to the key containing the hash. This is not a problem
@@ -135,6 +146,23 @@ module Xcflushd
       # time.
       storage.expire(auth_hash_key(service_id, user_key), valid_minutes * 60)
     end
+
+    def increase_usage(report)
+      hash_key = report_hash_key(report[:service_id], report[:user_key])
+
+      report[:usage].each_slice(REDIS_BATCH_KEYS) do |usages|
+        usages.each do |usage|
+          metric, value = usage
+          storage.hincrby(hash_key, metric, value)
+        end
+      end
+    end
+
+    def add_to_set_keys_cached_reports(report)
+      hash_key = report_hash_key(report[:service_id], report[:user_key])
+      storage.sadd(SET_KEYS_CACHED_REPORTS, hash_key)
+    end
+
   end
 
 end
