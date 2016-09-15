@@ -12,6 +12,10 @@ module Xcflushd
     SET_KEYS_FLUSHING_REPORTS = 'flushing_report_keys'.freeze
     private_constant :SET_KEYS_FLUSHING_REPORTS
 
+    # Prefix to identify cached authorizations
+    AUTH_KEY_PREFIX = 'auth:'.freeze
+    private_constant :AUTH_KEY_PREFIX
+
     # Prefix to identify cached reports
     REPORT_KEY_PREFIX = 'report:'.freeze
     private_constant :REPORT_KEY_PREFIX
@@ -132,7 +136,7 @@ module Xcflushd
     end
 
     def auth_hash_key(service_id, user_key)
-      "auth:#{service_id}:#{user_key}"
+      "#{AUTH_KEY_PREFIX}#{service_id}:#{user_key}"
     end
 
     def report_hash_key(service_id, user_key)
