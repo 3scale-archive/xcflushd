@@ -167,7 +167,11 @@ module Xcflushd
     end
 
     def auth_value(auth)
-      auth.authorized? ? '1'.freeze : '0'.freeze
+      if auth.authorized?
+        '1'.freeze
+      else
+        auth.reason ? "0:#{auth.reason}" : '0'.freeze
+      end
     end
 
   end
