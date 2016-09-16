@@ -97,10 +97,8 @@ module Xcflushd
       let(:authorized_metrics) { %w(am1 am2) }
       let(:non_authorized_metrics) { %w(nam1 nam2) }
       let(:authorizations) do
-        auths = {}
-        authorized_metrics.each { |metric| auths[metric] = true }
-        non_authorized_metrics.each { |metric| auths[metric] = false }
-        auths
+        authorized_metrics.map { |metric| Authorization.new(metric, true) } +
+          non_authorized_metrics.map { |metric| Authorization.new(metric, false) }
       end
 
       it 'renews the authorization of the authorized metrics' do

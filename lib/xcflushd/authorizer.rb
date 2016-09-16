@@ -3,6 +3,9 @@ require '3scale_client'
 module Xcflushd
   class Authorizer
 
+    DISABLED_METRIC = 'disabled'.freeze
+    private_constant :DISABLED_METRIC
+
     # Exception raised when the 3scale client is called with the right params
     # but it returns a ServerError. Most of the time this means that 3scale is
     # down.
@@ -42,21 +45,25 @@ module Xcflushd
     attr_reader :threescale_client
 
     def all_authorizations(service_id, user_key, metrics_usage, non_limited_metrics)
-      auths_limited_metrics(metrics_usage).merge(
-          auths_non_limited_metrics(service_id, user_key, non_limited_metrics))
+      auths_limited_metrics(metrics_usage) +
+          auths_non_limited_metrics(service_id, user_key, non_limited_metrics)
     end
 
     def auths_limited_metrics(metrics_usage)
       metrics_usage.map do |metric, limits|
-        [metric, next_hit_auth?(limits)]
-      end.to_h
+        if disabled_metric?(limits)
+          Authorization.new(metric, false, DISABLED_METRIC)
+        else
+          Authorization.new(metric, next_hit_auth?(limits))
+        end
+      end
     end
 
     def auths_non_limited_metrics(service_id, user_key, metrics)
       metrics.map do |metric|
         auth = nolimits_metric_next_hit_auth?(service_id, user_key, metric)
-        [metric, auth]
-      end.to_h
+        Authorization.new(metric, auth)
+      end
     end
 
     def app_usage_reports(service_id, user_key)
@@ -79,6 +86,10 @@ module Xcflushd
 
     def next_hit_auth?(limits)
       limits.all? { |limit| limit.current_value + 1 <= limit.max_value }
+    end
+
+    def disabled_metric?(limits)
+      limits.any? { |limit| limit.max_value == 0 }
     end
 
     def nolimits_metric_next_hit_auth?(service_id, user_key, metric)

@@ -56,8 +56,7 @@ module Xcflushd
 
       authorizations.each_slice(REDIS_BATCH_KEYS) do |authorizations_slice|
         authorizations_slice.each do |auth|
-          # auth[0] contains the metric and auth[1] the authorization boolean
-          storage.hset(hash_key, auth[0], auth[1] ? '1' : '0')
+          storage.hset(hash_key, auth.metric, auth_value(auth))
         end
       end
 
@@ -165,6 +164,10 @@ module Xcflushd
     def add_to_set_keys_cached_reports(report)
       hash_key = report_hash_key(report[:service_id], report[:user_key])
       storage.sadd(SET_KEYS_CACHED_REPORTS, hash_key)
+    end
+
+    def auth_value(auth)
+      auth.authorized? ? '1'.freeze : '0'.freeze
     end
 
   end
