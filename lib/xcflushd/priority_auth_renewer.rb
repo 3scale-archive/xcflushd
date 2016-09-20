@@ -32,6 +32,14 @@ module Xcflushd
       @redis_pubsub = redis_pubsub
       @auth_valid_min = auth_valid_min
 
+      # We can receive several requests to renew the authorization of a metric
+      # while we are already renewing it. We want to avoid performing several
+      # calls to 3scale asking for the same thing. For that reason, we use a
+      # hash to keep track of the metrics that we are renewing.
+      # This hash is updated from different threads. We use Concurrent::Hash
+      # to ensure thread-safety.
+      @current_auths = Concurrent::Hash.new
+
       # TODO: Tune the options of the thread pool
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
           max_threads: Concurrent.processor_count * 4)
@@ -42,7 +50,7 @@ module Xcflushd
     private
 
     attr_reader :authorizer, :storage, :redis_pubsub, :auth_valid_min,
-                :thread_pool
+                :current_auths, :thread_pool
 
     def subscribe_to_requests_channel
       redis_pubsub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
@@ -52,7 +60,10 @@ module Xcflushd
           # making networks requests, and also updating Redis. We cannot block
           # until we get all that done. That is why we need to treat the
           # messages received in the channel concurrently.
-          async_renew_and_publish_task(msg).execute
+          unless currently_authorizing?(msg)
+            mark_auth_task_as_current(msg)
+            async_renew_and_publish_task(msg).execute
+          end
         end
       end
     end
@@ -69,6 +80,7 @@ module Xcflushd
         app_auths = app_authorizations(metric)
         renew(metric[:service_id], metric[:user_key], app_auths)
         metric_auth = metric_authorization(app_auths, metric[:metric])
+        mark_auth_task_as_finished(channel_msg)
         publish_auth(metric, metric_auth)
       end
     end
@@ -107,6 +119,18 @@ module Xcflushd
             end
 
       redis_pubsub.publish(channel_for_metric(metric), msg)
+    end
+
+    def currently_authorizing?(channel_msg)
+      current_auths[channel_msg]
+    end
+
+    def mark_auth_task_as_current(channel_msg)
+      current_auths[channel_msg] = true
+    end
+
+    def mark_auth_task_as_finished(channel_msg)
+      current_auths.delete(channel_msg)
     end
   end
 end
