@@ -49,8 +49,10 @@ module Xcflushd
         end
 
         let(:authorizations) do
-          { app1: { 'm1' => true, 'm2' => false },
-            app2: { 'm3' => false, 'm4' => true } }
+          { app1: [Authorization.new('m1', true),
+                   Authorization.new('m2', false)],
+            app2: [Authorization.new('m3', false),
+                   Authorization.new('m4', true)] }
         end
 
         let(:pending_reports) do
@@ -131,7 +133,7 @@ module Xcflushd
 
         let(:pending_reports) { [failed_auth_report, ok_auth_report] }
         let(:exception) { RuntimeError.new }
-        let(:auths_for_ok_report) { { 'hits' => '1' } }
+        let(:auths_for_ok_report) { [Authorization.new('hits', true)] }
 
         before do
           allow(authorizer)
@@ -146,7 +148,7 @@ module Xcflushd
               .with(ok_auth_report[:service_id],
                     ok_auth_report[:user_key],
                     ok_auth_report[:usage].keys)
-              .and_return({ 'hits' => '1' })
+              .and_return(auths_for_ok_report)
         end
 
         it 'handles the error' do

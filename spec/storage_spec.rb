@@ -96,11 +96,14 @@ module Xcflushd
       let(:valid_min) { 5 }
       let(:authorized_metrics) { %w(am1 am2) }
       let(:non_authorized_metrics) { %w(nam1 nam2) }
+      let(:denied_auths_with_a_reason) do
+        [Authorization.new('nam3', false, 'a_reason')]
+      end
+
       let(:authorizations) do
-        auths = {}
-        authorized_metrics.each { |metric| auths[metric] = true }
-        non_authorized_metrics.each { |metric| auths[metric] = false }
-        auths
+        authorized_metrics.map { |metric| Authorization.new(metric, true) } +
+          non_authorized_metrics.map { |metric| Authorization.new(metric, false) } +
+          denied_auths_with_a_reason
       end
 
       it 'renews the authorization of the authorized metrics' do
@@ -114,6 +117,13 @@ module Xcflushd
         subject.renew_auths(service_id, user_key, authorizations, valid_min)
         non_authorized_metrics.each do |metric|
           expect(redis.hget(auth_hash_key, metric)).to eq '0'
+        end
+      end
+
+      it 'renews the authorization of denied metrics specifying the reason' do
+        subject.renew_auths(service_id, user_key, authorizations, valid_min)
+        denied_auths_with_a_reason.each do |auth|
+          expect(redis.hget(auth_hash_key, auth.metric)).to eq "0:#{auth.reason}"
         end
       end
 

@@ -29,16 +29,18 @@ module Xcflushd
       end
 
       shared_examples 'app with non-authorized metric' do
-        it 'returns the authorization status set to false' do
-          auths = subject.authorizations(service_id, user_key, reported_metrics)
-          expect(auths).to eq({ metric => false })
+        it 'returns a denied authorization' do
+          auth = subject.authorizations(service_id, user_key, reported_metrics).first
+          expect(auth.metric).to eq metric
+          expect(auth.authorized?).to be false
         end
       end
 
       shared_examples 'app with authorized metric' do
-        it 'returns the authorization status set to true' do
-          auths = subject.authorizations(service_id, user_key, reported_metrics)
-          expect(auths).to eq({ metric => true })
+        it 'returns an accepted authorization' do
+          auth = subject.authorizations(service_id, user_key, reported_metrics).first
+          expect(auth.metric).to eq metric
+          expect(auth.authorized?).to be true
         end
       end
 
@@ -94,11 +96,15 @@ module Xcflushd
         it 'returns the correct authorization status for all of them' do
           auths = subject.authorizations(service_id, user_key, reported_metrics)
 
-          expected_auths = {}
-          authorized_metrics.each { |metric| expected_auths[metric] = true }
-          unauthorized_metrics.each { |metric| expected_auths[metric] = false }
+          authorized_metrics.each do |metric|
+            expect(auths.any? { |auth| auth.metric == metric && auth.authorized? })
+                .to be true
+          end
 
-          expect(auths).to eq(expected_auths)
+          unauthorized_metrics.each do |metric|
+            expect(auths.any? { |auth| auth.metric == metric && !auth.authorized? })
+                .to be true
+          end
         end
       end
 
@@ -130,6 +136,17 @@ module Xcflushd
           end
 
           include_examples 'app with non-authorized metric'
+        end
+      end
+
+      context 'when there is a disable metric' do
+        let(:app_report_usages) { [Usage.new(metric, 'hour', 0, 0)] }
+
+        it 'returns a denied authorization that includes the reason' do
+          auth = subject.authorizations(service_id, user_key, reported_metrics).first
+          expect(auth.metric).to eq metric
+          expect(auth.authorized?).to be false
+          expect(auth.reason).to eq described_class.const_get(:DISABLED_METRIC)
         end
       end
 
