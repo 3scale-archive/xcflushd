@@ -6,7 +6,7 @@ module Xcflushd
     # Exception raised when the 3scale client is called with the right params
     # but it returns a ServerError. Most of the time this means that 3scale is
     # down.
-    class ThreeScaleInternalError < RuntimeError
+    class ThreeScaleInternalError < Flusher::XcflushdError
       def initialize(service_id, user_key)
         super("Error renewing auths of service with ID #{service_id} "\
               "and user_key #{user_key}. 3scale seems to be down")

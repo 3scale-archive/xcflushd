@@ -3,7 +3,7 @@ require '3scale_client'
 module Xcflushd
   class Reporter
 
-    class ReporterError < RuntimeError
+    class ReporterError < Flusher::XcflushdError
       def initialize(service_id, transaction, specific_msg)
         super("Error reporting this transaction: #{transaction} "\
               "for service with id #{service_id}. "\

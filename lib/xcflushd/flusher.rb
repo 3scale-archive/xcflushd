@@ -2,6 +2,7 @@ require 'concurrent'
 
 module Xcflushd
   class Flusher
+    XcflushdError = Class.new(StandardError)
 
     def initialize(reporter, authorizer, storage, auth_valid_min, error_handler)
       @reporter = reporter
