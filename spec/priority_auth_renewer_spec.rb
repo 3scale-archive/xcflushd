@@ -45,7 +45,16 @@ module Xcflushd
           .and_return(authorizations)
 
       redis_pubsub.publish(auth_requests_channel, requests_channel_msg)
-      described_class.new(authorizer, storage, redis_pubsub, auth_valid_min)
+
+      renewer = described_class.new(
+          authorizer, storage, redis_pubsub, auth_valid_min)
+
+      # When the renewer receives a message, it renews the authorizations and
+      # publishes them asynchronously. For these tests, we need to force the
+      # execution and block until all the async tasks are finished.
+      # shutdown processes the pending tasks and stops accepting more.
+      renewer.send(:thread_pool).shutdown
+      renewer.send(:thread_pool).wait_for_termination
     end
 
     shared_examples 'authorization to be renewed' do |auth|

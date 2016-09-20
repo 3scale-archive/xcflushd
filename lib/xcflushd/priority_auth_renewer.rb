@@ -31,29 +31,45 @@ module Xcflushd
       @storage = storage
       @redis_pubsub = redis_pubsub
       @auth_valid_min = auth_valid_min
+
+      # TODO: Tune the options of the thread pool
+      @thread_pool = Concurrent::ThreadPoolExecutor.new(
+          max_threads: Concurrent.processor_count * 4)
+
       subscribe_to_requests_channel
     end
 
     private
 
-    attr_reader :authorizer, :storage, :redis_pubsub, :auth_valid_min
+    attr_reader :authorizer, :storage, :redis_pubsub, :auth_valid_min,
+                :thread_pool
 
     def subscribe_to_requests_channel
       redis_pubsub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
-        # Apart from renewing the auth of the metric received, we also renew
-        # all the metrics of the app it belongs to. The reason is that to renew
-        # only 1 metric we need to perform 1 call to 3scale, and to renew all
-        # the limited metrics of an application we also need 1. If the metric
-        # received does not have limits defined, we need to perform 2 calls,
-        # but still, it is worth to renew all of them for that price.
         on.message do |_channel, msg|
-          # metric is a hash of service_id, user_key, and metric name
-          metric = auth_channel_msg_2_metric(msg)
-          app_auths = app_authorizations(metric)
-          renew(metric[:service_id], metric[:user_key], app_auths)
-          metric_auth = metric_authorization(app_auths, metric[:metric])
-          publish_auth(metric, metric_auth)
+          # The renew and publish operations need to be done asynchronously.
+          # Renewing the authorizations involves getting them from 3scale,
+          # making networks requests, and also updating Redis. We cannot block
+          # until we get all that done. That is why we need to treat the
+          # messages received in the channel concurrently.
+          async_renew_and_publish_task(msg).execute
         end
+      end
+    end
+
+    # Apart from renewing the auth of the metric received, we also renew all
+    # the metrics of the app it belongs to. The reason is that to renew only 1
+    # metric we need to perform 1 call to 3scale, and to renew all the limited
+    # metrics of an application we also need 1. If the metric received does not
+    # have limits defined, we need to perform 2 calls, but still, it is worth
+    # to renew all of them for that price.
+    def async_renew_and_publish_task(channel_msg)
+      Concurrent::Future.new(executor: thread_pool) do
+        metric = auth_channel_msg_2_metric(channel_msg)
+        app_auths = app_authorizations(metric)
+        renew(metric[:service_id], metric[:user_key], app_auths)
+        metric_auth = metric_authorization(app_auths, metric[:metric])
+        publish_auth(metric, metric_auth)
       end
     end
 
