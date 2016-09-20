@@ -1,5 +1,7 @@
-require 'xcflushd/authorizer'
+require 'xcflushd/logger'
 require 'xcflushd/flusher'
+require 'xcflushd/authorizer'
 require 'xcflushd/reporter'
 require 'xcflushd/storage'
+require 'xcflushd/flusher_error_handler'
 require 'xcflushd/version'

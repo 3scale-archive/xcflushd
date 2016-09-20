@@ -12,6 +12,10 @@ module Xcflushd
     SET_KEYS_FLUSHING_REPORTS = 'flushing_report_keys'.freeze
     private_constant :SET_KEYS_FLUSHING_REPORTS
 
+    # Prefix to identify cached authorizations
+    AUTH_KEY_PREFIX = 'auth:'.freeze
+    private_constant :AUTH_KEY_PREFIX
+
     # Prefix to identify cached reports
     REPORT_KEY_PREFIX = 'report:'.freeze
     private_constant :REPORT_KEY_PREFIX
@@ -58,6 +62,13 @@ module Xcflushd
       end
 
       set_auth_validity(service_id, user_key, valid_minutes)
+    end
+
+    def report(reports)
+      reports.each do |report|
+        increase_usage(report)
+        add_to_set_keys_cached_reports(report)
+      end
     end
 
     private
@@ -125,7 +136,11 @@ module Xcflushd
     end
 
     def auth_hash_key(service_id, user_key)
-      "auth:#{service_id}:#{user_key}"
+      "#{AUTH_KEY_PREFIX}#{service_id}:#{user_key}"
+    end
+
+    def report_hash_key(service_id, user_key)
+      "#{REPORT_KEY_PREFIX}#{service_id}:#{user_key}"
     end
 
     def set_auth_validity(service_id, user_key, valid_minutes)
@@ -135,6 +150,23 @@ module Xcflushd
       # time.
       storage.expire(auth_hash_key(service_id, user_key), valid_minutes * 60)
     end
+
+    def increase_usage(report)
+      hash_key = report_hash_key(report[:service_id], report[:user_key])
+
+      report[:usage].each_slice(REDIS_BATCH_KEYS) do |usages|
+        usages.each do |usage|
+          metric, value = usage
+          storage.hincrby(hash_key, metric, value)
+        end
+      end
+    end
+
+    def add_to_set_keys_cached_reports(report)
+      hash_key = report_hash_key(report[:service_id], report[:user_key])
+      storage.sadd(SET_KEYS_CACHED_REPORTS, hash_key)
+    end
+
   end
 
 end

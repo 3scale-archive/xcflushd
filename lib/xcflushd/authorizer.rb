@@ -6,7 +6,12 @@ module Xcflushd
     # Exception raised when the 3scale client is called with the right params
     # but it returns a ServerError. Most of the time this means that 3scale is
     # down.
-    ThreeScaleInternalError = Class.new(RuntimeError)
+    class ThreeScaleInternalError < Flusher::XcflushdError
+      def initialize(service_id, user_key)
+        super("Error renewing auths of service with ID #{service_id} "\
+              "and user_key #{user_key}. 3scale seems to be down")
+      end
+    end
 
     def initialize(threescale_client)
       @threescale_client = threescale_client
@@ -55,7 +60,7 @@ module Xcflushd
     end
 
     def app_usage_reports(service_id, user_key)
-      with_3scale_error_rescue do
+      with_3scale_error_rescue(service_id, user_key) do
         threescale_client
             .authorize(service_id: service_id, user_key: user_key)
             .usage_reports
@@ -83,18 +88,18 @@ module Xcflushd
       # metric.
       # Ideally, we would like 3scale backend to provide a way to retrieve
       # optionally all the metrics in a single authorize call.
-      with_3scale_error_rescue do
+      with_3scale_error_rescue(service_id, user_key) do
         threescale_client.authorize(service_id: service_id,
                                     user_key: user_key,
                                     usage: { metric => 1 }).success?
       end
     end
 
-    def with_3scale_error_rescue
+    def with_3scale_error_rescue(service_id, user_key)
       begin
         yield
-      rescue ThreeScale::ServerError => e # TODO: get rid of this coupling
-        raise ThreeScaleInternalError, e.message
+      rescue ThreeScale::ServerError
+        raise ThreeScaleInternalError.new(service_id, user_key)
       end
     end
   end
