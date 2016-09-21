@@ -75,6 +75,8 @@ module Xcflushd
     attr_reader :storage
 
     def report_keys_to_flush
+      return [] if storage.scard(SET_KEYS_CACHED_REPORTS) == 0
+
       storage.rename(SET_KEYS_CACHED_REPORTS, SET_KEYS_FLUSHING_REPORTS)
 
       keys_with_flushing_prefix = flushing_report_keys.map do |key|
