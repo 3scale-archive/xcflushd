@@ -57,7 +57,8 @@ command :run do |c|
                          options[:provider_key],
                          options[:redis_host],
                          options[:redis_port].to_i,
-                         options[:auth_valid_minutes].to_i)
+                         options[:auth_valid_minutes].to_i,
+                         options[:reporting_freq_minutes].to_i)
   end
 end
 
