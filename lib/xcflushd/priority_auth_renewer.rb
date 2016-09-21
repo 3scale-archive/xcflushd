@@ -26,10 +26,14 @@ module Xcflushd
     AUTH_RESPONSES_CHANNEL_PREFIX = 'xc_channel_auth_response:'.freeze
     private_constant :AUTH_RESPONSES_CHANNEL_PREFIX
 
-    def initialize(authorizer, storage, redis_pubsub, auth_valid_min)
+    # We need two separate Redis clients: one for subscribing to a channel and
+    # the other one to publish to different channels. It is specified in the
+    # Redis website: http://redis.io/topics/pubsub
+    def initialize(authorizer, storage, redis_pub, redis_sub, auth_valid_min)
       @authorizer = authorizer
       @storage = storage
-      @redis_pubsub = redis_pubsub
+      @redis_pub = redis_pub
+      @redis_sub = redis_sub
       @auth_valid_min = auth_valid_min
 
       # We can receive several requests to renew the authorization of a metric
@@ -49,11 +53,11 @@ module Xcflushd
 
     private
 
-    attr_reader :authorizer, :storage, :redis_pubsub, :auth_valid_min,
+    attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_valid_min,
                 :current_auths, :thread_pool
 
     def subscribe_to_requests_channel
-      redis_pubsub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
+      redis_sub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
         on.message do |_channel, msg|
           # The renew and publish operations need to be done asynchronously.
           # Renewing the authorizations involves getting them from 3scale,
@@ -118,7 +122,7 @@ module Xcflushd
                authorization.reason ? "0:#{authorization.reason}" : '0'.freeze
             end
 
-      redis_pubsub.publish(channel_for_metric(metric), msg)
+      redis_pub.publish(channel_for_metric(metric), msg)
     end
 
     def currently_authorizing?(channel_msg)

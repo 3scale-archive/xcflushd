@@ -13,7 +13,8 @@ module Xcflushd
     let(:authorizer) { double('authorizer') }
     let(:redis_storage) { Redis.new }
     let(:storage) { Storage.new(redis_storage) }
-    let(:redis_pubsub) { Redis.new }
+    let(:redis_pub) { Redis.new }
+    let(:redis_sub) { Redis.new }
     let(:auth_valid_min) { 10 }
 
     let(:auth_requests_channel) do
@@ -44,10 +45,10 @@ module Xcflushd
           .with(service_id, user_key, [metric])
           .and_return(authorizations)
 
-      redis_pubsub.publish(auth_requests_channel, requests_channel_msg)
+      redis_pub.publish(auth_requests_channel, requests_channel_msg)
 
       renewer = described_class.new(
-          authorizer, storage, redis_pubsub, auth_valid_min)
+          authorizer, storage, redis_pub, redis_sub, auth_valid_min)
 
       # When the renewer receives a message, it renews the authorizations and
       # publishes them asynchronously. For these tests, we need to force the
@@ -65,7 +66,7 @@ module Xcflushd
       end
 
       it 'publishes the authorization status to the appropriate channel' do
-        redis_pubsub.subscribe(responses_channel) do |on|
+        redis_sub.subscribe(responses_channel) do |on|
           on.message { |_channel, msg| expect(msg).to eq auth }
         end
       end
