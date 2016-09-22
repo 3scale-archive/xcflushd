@@ -85,7 +85,29 @@ module Xcflushd
         renew(metric[:service_id], metric[:user_key], app_auths)
         metric_auth = metric_authorization(app_auths, metric[:metric])
         mark_auth_task_as_finished(channel_msg)
-        publish_auth(metric, metric_auth)
+
+        # There is a race condition here. A task of this type is only executed
+        # when there is not another one renewing the same metric. When there is
+        # another, the incoming request does not trigger a new task, but waits
+        # for the publish below. The request could miss the published message
+        # if events happened in this order:
+        #   1) The request publishes the metric it needs in the requests
+        #      channel.
+        #   2) A new task is not executed, because there is another renewing
+        #      the same metric.
+        #   3) That task publishes the result.
+        #   4) The request subscribes to receive the result, but now it is
+        #      too late.
+        # I cannot think of an easy way to solve this. There is some time
+        # between the moment the requests performs the publish and the
+        # subscribe actions. To mitigate the problem we can publish several
+        # times during some ms. We will see if this is good enough.
+        # Trade-off: publishing too much increases the Redis load. Waiting too
+        # much makes the incoming request slow.
+        5.times do |t|
+          publish_auth(metric, metric_auth)
+          sleep((1.0/50)*((t+1)**2))
+        end
       end
     end
 

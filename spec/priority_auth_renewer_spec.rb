@@ -40,6 +40,9 @@ module Xcflushd
     let(:authorizations) { metric_auth + other_app_metrics_auths }
 
     before do
+      # We need to wait in the code, but not here in the tests.
+      allow_any_instance_of(Object).to receive(:sleep)
+
       allow(authorizer)
           .to receive(:authorizations)
           .with(service_id, user_key, [metric])
