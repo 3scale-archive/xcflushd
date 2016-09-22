@@ -26,6 +26,9 @@ module Xcflushd
     AUTH_RESPONSES_CHANNEL_PREFIX = 'xc_channel_auth_response:'.freeze
     private_constant :AUTH_RESPONSES_CHANNEL_PREFIX
 
+    MAX_RANDOM = 1 << 31
+    private_constant :MAX_RANDOM
+
     # We need two separate Redis clients: one for subscribing to a channel and
     # the other one to publish to different channels. It is specified in the
     # Redis website: http://redis.io/topics/pubsub
@@ -39,10 +42,12 @@ module Xcflushd
       # We can receive several requests to renew the authorization of a metric
       # while we are already renewing it. We want to avoid performing several
       # calls to 3scale asking for the same thing. For that reason, we use a
-      # hash to keep track of the metrics that we are renewing.
-      # This hash is updated from different threads. We use Concurrent::Hash
+      # map to keep track of the metrics that we are renewing.
+      # This map is updated from different threads. We use Concurrent::Map
       # to ensure thread-safety.
-      @current_auths = Concurrent::Hash.new
+      @current_auths = Concurrent::Map.new
+
+      @random = Random.new
 
       # TODO: Tune the options of the thread pool
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
@@ -54,7 +59,7 @@ module Xcflushd
     private
 
     attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_valid_min,
-                :current_auths, :thread_pool
+                :current_auths, :random, :thread_pool
 
     def subscribe_to_requests_channel
       redis_sub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
@@ -65,7 +70,6 @@ module Xcflushd
           # until we get all that done. That is why we need to treat the
           # messages received in the channel concurrently.
           unless currently_authorizing?(msg)
-            mark_auth_task_as_current(msg)
             async_renew_and_publish_task(msg).execute
           end
         end
@@ -148,11 +152,23 @@ module Xcflushd
     end
 
     def currently_authorizing?(channel_msg)
-      current_auths[channel_msg]
-    end
+      # A simple solution would be something like:
+      # if !current_auths[channel_msg]
+      #   current_auths[channel_msg] = true;
+      #   perform_work
+      #   current_auths.delete(channel_msg)
+      # end
+      # The problem is that the read/write is not atomic. Therefore, several
+      # threads could enter the if at the same time repeating work. That is
+      # why we use concurrent-ruby's Map#put_if_absent, which is atomic.
 
-    def mark_auth_task_as_current(channel_msg)
-      current_auths[channel_msg] = true
+      # Using this method with randoms, there can be collisions. However, the
+      # code is way simpler that other solutions that we can think of. Also,
+      # when there is a collision (and they should not be that frequent), the
+      # only problem is that we will contact 3scale asking for the same thing
+      # several times in parallel.
+      r = random.rand(MAX_RANDOM)
+      current_auths.put_if_absent(channel_msg, r) != nil
     end
 
     def mark_auth_task_as_finished(channel_msg)
