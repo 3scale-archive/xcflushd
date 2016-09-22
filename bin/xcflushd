@@ -6,13 +6,10 @@ require 'xcflushd/runner'
 include GLI::App
 
 def start_xcflusher(options)
-  Xcflushd::Runner.run(options[:threescale_host],
-                       options[:threescale_port].to_i,
-                       options[:provider_key],
-                       options[:redis_host],
-                       options[:redis_port].to_i,
-                       options[:auth_valid_minutes].to_i,
-                       options[:reporting_freq_minutes].to_i)
+  int_opt_fields = [:threescale_port, :redis_port,
+                    :auth_valid_minutes, :reporting_freq_minutes]
+  int_opt_fields.each { |opt| options[opt] = options[opt].to_i }
+  Xcflushd::Runner.run(options)
 end
 
 program_desc 'XC flush daemon'

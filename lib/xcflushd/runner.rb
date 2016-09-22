@@ -7,22 +7,22 @@ module Xcflushd
   class Runner
     class << self
 
-      def run(threescale_host, threescale_port, provider_key,
-              redis_host, redis_port, auth_valid_min, flush_freq_min)
-        redis = Redis.new(host: redis_host, port: redis_port, driver: :hiredis)
+      def run(opts = {})
+        redis = Redis.new(
+            host: opts[:redis_host], port: opts[:redis_port], driver: :hiredis)
         storage = Storage.new(redis)
-        threescale = ThreeScale::Client.new(provider_key: provider_key,
-                                            host: threescale_host,
-                                            port: threescale_port,
+        threescale = ThreeScale::Client.new(provider_key: opts[:provider_key],
+                                            host: opts[:threescale_host],
+                                            port: opts[:threescale_port],
                                             persistent: true)
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)
         logger = Logger.new(STDOUT)
-        flusher_error_handler = FlusherErrorHandler.new(logger, storage)
-        flusher = Flusher.new(reporter, authorizer, storage, auth_valid_min,
-                              flusher_error_handler)
+        error_handler = FlusherErrorHandler.new(logger, storage)
+        flusher = Flusher.new(
+            reporter, authorizer, storage, opts[:auth_valid_minutes], error_handler)
 
-        flush_periodically(flusher, flush_freq_min, logger)
+        flush_periodically(flusher, opts[:reporting_freq_minutes], logger)
       end
 
       private
