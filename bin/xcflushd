@@ -5,6 +5,13 @@ require 'xcflushd/runner'
 
 include GLI::App
 
+def start_xcflusher(options)
+  int_opt_fields = [:threescale_port, :redis_port,
+                    :auth_valid_minutes, :reporting_freq_minutes]
+  int_opt_fields.each { |opt| options[opt] = options[opt].to_i }
+  Xcflushd::Runner.run(options)
+end
+
 program_desc 'XC flush daemon'
 
 version Xcflushd::VERSION
@@ -36,6 +43,9 @@ command :run do |c|
   c.desc 'Reporting frequency (in minutes)'
   c.flag :reporting_freq_minutes
 
+  c.desc 'Daemonize'
+  c.switch :daemonize
+
   c.action do |_global_options, options, _args|
     [:threescale_host,
      :provider_key,
@@ -52,12 +62,18 @@ command :run do |c|
                 'account the new reports.')
     end
 
-    Xcflushd::Runner.run(options[:threescale_host],
-                         options[:threescale_port].to_i,
-                         options[:provider_key],
-                         options[:redis_host],
-                         options[:redis_port].to_i,
-                         options[:auth_valid_minutes].to_i)
+    if options[:daemonize]
+      require 'daemons'
+      begin
+        Daemons.run_proc('xcflush') { start_xcflusher(options) }
+        # When forking, the parent executes 'exit', and GLI thinks that there
+        # has been an error. Let's return the correct exit code.
+      rescue SystemExit => e
+        e.status
+      end
+    else
+      start_xcflusher(options)
+    end
   end
 end
 

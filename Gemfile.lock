@@ -4,6 +4,7 @@ PATH
     xcflushd (0.1.0)
       3scale_client (= 2.8.0)
       concurrent-ruby (= 1.0.2)
+      daemons (= 1.2.4)
       gli (= 2.14.0)
       hiredis (= 0.6.1)
       net-http-persistent (= 2.9.4)
@@ -15,6 +16,7 @@ GEM
     3scale_client (2.8.0)
       nokogiri
     concurrent-ruby (1.0.2)
+    daemons (1.2.4)
     diff-lcs (1.2.5)
     docile (1.1.5)
     fakeredis (0.5.0)
