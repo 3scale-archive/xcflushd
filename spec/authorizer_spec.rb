@@ -19,6 +19,7 @@ module Xcflushd
       before do
         test_report_usages = app_report_usages
         authorize_resp = Object.new.tap do |o|
+          o.define_singleton_method(:success?) { true }
           o.define_singleton_method(:usage_reports) { test_report_usages }
         end
 
@@ -132,7 +133,10 @@ module Xcflushd
 
         context 'and the metric is not authorized' do
           let(:authorize_resp) do
-            Object.new.tap { |o| o.define_singleton_method(:success?) { false } }
+            Object.new.tap do |o|
+              o.define_singleton_method(:success?) { false }
+              o.define_singleton_method(:error_code) { 'a_deny_reason' }
+            end
           end
 
           include_examples 'app with non-authorized metric'
@@ -147,6 +151,35 @@ module Xcflushd
           expect(auth.metric).to eq metric
           expect(auth.authorized?).to be false
           expect(auth.reason).to eq described_class.const_get(:DISABLED_METRIC)
+        end
+      end
+
+      context 'when the authorization is denied and it is not because limits are exceeded' do
+        let(:app_report_usages) { [] }
+        let(:reported_metrics) { %w(m1 m2) }
+        let(:reason) { 'a_deny_reason' }
+        let(:auth_response) do
+          double('auth_response',
+                 success?: false, error_code: reason, error_message: 'msg')
+        end
+
+        before do
+          allow(threescale_client)
+              .to receive(:authorize)
+              .with({ service_id: service_id, user_key: user_key })
+              .and_return(auth_response)
+        end
+
+        it 'returns a denied auth for each of the reported metrics' do
+          auths = subject.authorizations(service_id, user_key, reported_metrics)
+
+          expect(auths.size).to eq reported_metrics.size
+
+          reported_metrics.each do |metric|
+            expect(auths.any? do |m|
+              m.metric == metric && !m.authorized? && m.reason == reason
+            end).to be true
+          end
         end
       end
 
