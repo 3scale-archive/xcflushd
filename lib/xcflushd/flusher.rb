@@ -2,6 +2,10 @@ require 'concurrent'
 
 module Xcflushd
   class Flusher
+
+    WAIT_TIME_REPORT_AUTH = 5 # in seconds
+    private_constant :WAIT_TIME_REPORT_AUTH
+
     XcflushdError = Class.new(StandardError)
 
     def initialize(reporter, authorizer, storage, auth_valid_min, error_handler)
@@ -20,6 +24,16 @@ module Xcflushd
     def flush
       reports_to_flush = reports
       report(reports_to_flush)
+
+      # Ideally, we would like to ensure that once we start checking
+      # authorizations, they have taken into account the reports that we just
+      # performed. However, in 3scale, reports are asynchronous and the current
+      # API does not provide a way to know whether a report has already been
+      # processed.
+      # For now, let's just wait a few seconds. This will greatly mitigate the
+      # problem.
+      sleep(WAIT_TIME_REPORT_AUTH)
+
       renew(authorizations(reports_to_flush))
     end
 

@@ -22,6 +22,11 @@ module Xcflushd
       described_class.new(reporter, authorizer, storage, auth_valid_min, error_handler)
     end
 
+    before do
+      # There are sleeps in the class, but we do not need to wait in the tests.
+      allow_any_instance_of(described_class).to receive(:sleep)
+    end
+
     describe '#flush' do
       describe 'when there are no pending reports to flush' do
         let(:pending_reports) { [] }
