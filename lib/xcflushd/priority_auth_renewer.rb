@@ -52,7 +52,9 @@ module Xcflushd
       # TODO: Tune the options of the thread pool
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
           max_threads: Concurrent.processor_count * 4)
+    end
 
+    def start
       subscribe_to_requests_channel
     end
 

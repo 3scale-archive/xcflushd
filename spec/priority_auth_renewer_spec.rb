@@ -53,6 +53,8 @@ module Xcflushd
       renewer = described_class.new(
           authorizer, storage, redis_pub, redis_sub, auth_valid_min)
 
+      renewer.start
+
       # When the renewer receives a message, it renews the authorizations and
       # publishes them asynchronously. For these tests, we need to force the
       # execution and block until all the async tasks are finished.
