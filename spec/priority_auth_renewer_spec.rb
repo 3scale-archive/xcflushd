@@ -72,6 +72,10 @@ module Xcflushd
           expect(cached_auth).to eq(metric_auth.authorized? ? '1' : '0')
         end
       end
+
+      it 'removes the authorization processed from the list of current ones' do
+        expect(subject.send(:current_auths)).to be_empty
+      end
     end
 
     context 'when the message is processed correctly' do
@@ -122,6 +126,20 @@ module Xcflushd
 
       it 'logs an error' do
         expect(logger).to have_received(:error)
+      end
+    end
+
+    context 'when there is an error in the renew and publish task' do
+      before do
+        allow(authorizer).to receive(:authorizations).and_raise
+
+        subject.start
+        subject.send(:thread_pool).shutdown
+        subject.send(:thread_pool).wait_for_termination
+      end
+
+      it 'removes the authorization processed from the list of current ones' do
+        expect(subject.send(:current_auths)).to be_empty
       end
     end
   end

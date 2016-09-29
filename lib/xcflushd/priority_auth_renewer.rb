@@ -106,11 +106,17 @@ module Xcflushd
     # listed above are (hopefully) temporary.
     def async_renew_and_publish_task(channel_msg)
       Concurrent::Future.new(executor: thread_pool) do
-        metric = auth_channel_msg_2_metric(channel_msg)
-        app_auths = app_authorizations(metric)
-        renew(metric[:service_id], metric[:user_key], app_auths)
-        metric_auth = metric_authorization(app_auths, metric[:metric])
-        mark_auth_task_as_finished(channel_msg)
+        begin
+          metric = auth_channel_msg_2_metric(channel_msg)
+          app_auths = app_authorizations(metric)
+          renew(metric[:service_id], metric[:user_key], app_auths)
+          metric_auth = metric_authorization(app_auths, metric[:metric])
+        rescue StandardError
+          # If we do not do this, we would not be able to process the same
+          # message again.
+        ensure
+          mark_auth_task_as_finished(channel_msg)
+        end
 
         # There is a race condition here. A task of this type is only executed
         # when there is not another one renewing the same metric. When there is
