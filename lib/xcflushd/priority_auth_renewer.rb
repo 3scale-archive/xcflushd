@@ -84,6 +84,15 @@ module Xcflushd
     # metrics of an application we also need 1. If the metric received does not
     # have limits defined, we need to perform 2 calls, but still, it is worth
     # to renew all of them for that price.
+    #
+    # Note: Some exceptions can be raised inside the futures that are executed
+    # by the thread pool. For example, when 3scale is not accessible, when
+    # renewing the cached authorizations fails, or when publishing to the
+    # response channels fails. Trying to recover from all those cases does not
+    # seem to be worth it. The request that published the message will wait for
+    # a response that will not arrive and eventually, it will timeout. However,
+    # if the request retries, it is likely to succeed, as the kind of errors
+    # listed above are (hopefully) temporary.
     def async_renew_and_publish_task(channel_msg)
       Concurrent::Future.new(executor: thread_pool) do
         metric = auth_channel_msg_2_metric(channel_msg)
