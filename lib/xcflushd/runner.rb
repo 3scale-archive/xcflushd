@@ -28,7 +28,7 @@ module Xcflushd
           redis_sub = Redis.new(
               host: opts[:redis_host], port: opts[:redis_port], driver: :hiredis)
           PriorityAuthRenewer
-              .new(authorizer, storage, redis_pub, redis_sub, opts[:auth_valid_minutes])
+              .new(authorizer, storage, redis_pub, redis_sub, opts[:auth_valid_minutes], logger)
               .start
         end
 

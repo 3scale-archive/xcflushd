@@ -32,12 +32,13 @@ module Xcflushd
     # We need two separate Redis clients: one for subscribing to a channel and
     # the other one to publish to different channels. It is specified in the
     # Redis website: http://redis.io/topics/pubsub
-    def initialize(authorizer, storage, redis_pub, redis_sub, auth_valid_min)
+    def initialize(authorizer, storage, redis_pub, redis_sub, auth_valid_min, logger)
       @authorizer = authorizer
       @storage = storage
       @redis_pub = redis_pub
       @redis_sub = redis_sub
       @auth_valid_min = auth_valid_min
+      @logger = logger
 
       # We can receive several requests to renew the authorization of a metric
       # while we are already renewing it. We want to avoid performing several
@@ -61,18 +62,28 @@ module Xcflushd
     private
 
     attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_valid_min,
-                :current_auths, :random, :thread_pool
+                :logger, :current_auths, :random, :thread_pool
 
     def subscribe_to_requests_channel
       redis_sub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
         on.message do |_channel, msg|
-          # The renew and publish operations need to be done asynchronously.
-          # Renewing the authorizations involves getting them from 3scale,
-          # making networks requests, and also updating Redis. We cannot block
-          # until we get all that done. That is why we need to treat the
-          # messages received in the channel concurrently.
-          unless currently_authorizing?(msg)
-            async_renew_and_publish_task(msg).execute
+          begin
+            # The renew and publish operations need to be done asynchronously.
+            # Renewing the authorizations involves getting them from 3scale,
+            # making networks requests, and also updating Redis. We cannot block
+            # until we get all that done. That is why we need to treat the
+            # messages received in the channel concurrently.
+            unless currently_authorizing?(msg)
+              async_renew_and_publish_task(msg).execute
+            end
+          rescue StandardError => e
+            # If we do not rescue from an exception raised while treating a
+            # message, the redis client instance used stops receiving messages.
+            # We need to make sure that we'll rescue in all cases.
+            # Keep in mind that this will not rescue from exceptions raised in
+            # async tasks because they are executed in different threads.
+            logger.error('Error while treating a message received in the '\
+                         "requests channel: #{e.message}")
           end
         end
       end

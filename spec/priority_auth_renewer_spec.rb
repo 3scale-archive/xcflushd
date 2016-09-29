@@ -16,6 +16,12 @@ module Xcflushd
     let(:redis_pub) { Redis.new }
     let(:redis_sub) { Redis.new }
     let(:auth_valid_min) { 10 }
+    let(:logger) { double('logger', warn: true, error: true) }
+
+    subject do
+      described_class.new(
+          authorizer, storage, redis_pub, redis_sub, auth_valid_min, logger)
+    end
 
     let(:auth_requests_channel) do
       described_class.const_get(:AUTH_REQUESTS_CHANNEL)
@@ -43,24 +49,7 @@ module Xcflushd
       # We need to wait in the code, but not here in the tests.
       allow_any_instance_of(Object).to receive(:sleep)
 
-      allow(authorizer)
-          .to receive(:authorizations)
-          .with(service_id, user_key, [metric])
-          .and_return(authorizations)
-
       redis_pub.publish(auth_requests_channel, requests_channel_msg)
-
-      renewer = described_class.new(
-          authorizer, storage, redis_pub, redis_sub, auth_valid_min)
-
-      renewer.start
-
-      # When the renewer receives a message, it renews the authorizations and
-      # publishes them asynchronously. For these tests, we need to force the
-      # execution and block until all the async tasks are finished.
-      # shutdown processes the pending tasks and stops accepting more.
-      renewer.send(:thread_pool).shutdown
-      renewer.send(:thread_pool).wait_for_termination
     end
 
     shared_examples 'authorization to be renewed' do |auth|
@@ -85,20 +74,54 @@ module Xcflushd
       end
     end
 
-    context 'when the metric received is authorized' do
-      let(:metric_auth) { [Authorization.new(metric, true)] }
-      include_examples 'authorization to be renewed', '1'
-    end
+    context 'when the message is processed correctly' do
+      before do
+        allow(authorizer)
+            .to receive(:authorizations)
+            .with(service_id, user_key, [metric])
+            .and_return(authorizations)
 
-    context 'when the metric received is not authorized' do
-      context 'and the deny reason is specified' do
-        let(:metric_auth) { [Authorization.new(metric, false, 'a_reason')] }
-        include_examples 'authorization to be renewed', '0:a_reason'
+        subject.start
+
+        # When the renewer receives a message, it renews the authorizations and
+        # publishes them asynchronously. For these tests, we need to force the
+        # execution and block until all the async tasks are finished.
+        # shutdown processes the pending tasks and stops accepting more.
+        subject.send(:thread_pool).shutdown
+        subject.send(:thread_pool).wait_for_termination
       end
 
-      context 'and the deny reason is not specified' do
-        let(:metric_auth) { [Authorization.new(metric, false)] }
-        include_examples 'authorization to be renewed', '0'
+      context 'and the metric received is authorized' do
+        let(:metric_auth) { [Authorization.new(metric, true)] }
+        include_examples 'authorization to be renewed', '1'
+      end
+
+      context 'and the metric received is not authorized' do
+        context 'and the deny reason is specified' do
+          let(:metric_auth) { [Authorization.new(metric, false, 'a_reason')] }
+          include_examples 'authorization to be renewed', '0:a_reason'
+        end
+
+        context 'and the deny reason is not specified' do
+          let(:metric_auth) { [Authorization.new(metric, false)] }
+          include_examples 'authorization to be renewed', '0'
+        end
+      end
+    end
+
+    context 'when processing the message fails' do
+      before do
+        allow(subject)
+            .to receive(:async_renew_and_publish_task)
+            .and_raise(StandardError.new)
+
+        subject.start
+        subject.send(:thread_pool).shutdown
+        subject.send(:thread_pool).wait_for_termination
+      end
+
+      it 'logs an error' do
+        expect(logger).to have_received(:error)
       end
     end
   end
