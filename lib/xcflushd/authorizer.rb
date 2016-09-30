@@ -3,9 +3,6 @@ require '3scale_client'
 module Xcflushd
   class Authorizer
 
-    DISABLED_METRIC = 'disabled'.freeze
-    private_constant :DISABLED_METRIC
-
     # Exception raised when the 3scale client is called with the right params
     # but it returns a ServerError. Most of the time this means that 3scale is
     # down.
@@ -69,16 +66,8 @@ module Xcflushd
 
     def auths_limited_metrics(metrics_usage)
       metrics_usage.map do |metric, limits|
-        # Authorization calls to 3scale return a reason when they are denied.
-        # A requirement for XC is knowing whether the reason is that a metric
-        # is disabled. Unfortunately, this reason is not returned by 3scale.
-        # Therefore, we need to treat it separately.
-        if disabled_metric?(limits)
-          Authorization.new(metric, false, DISABLED_METRIC)
-        else
-          auth = next_hit_auth?(limits)
-          Authorization.new(metric, auth, auth ? nil : 'limits_exceeded'.freeze)
-        end
+        auth = next_hit_auth?(limits)
+        Authorization.new(metric, auth, auth ? nil : 'limits_exceeded'.freeze)
       end
     end
 
@@ -104,10 +93,6 @@ module Xcflushd
 
     def next_hit_auth?(limits)
       limits.all? { |limit| limit.current_value + 1 <= limit.max_value }
-    end
-
-    def disabled_metric?(limits)
-      limits.any? { |limit| limit.max_value == 0 }
     end
 
     def with_3scale_error_rescue(service_id, user_key)

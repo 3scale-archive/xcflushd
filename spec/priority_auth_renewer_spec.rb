@@ -92,8 +92,8 @@ module Xcflushd
 
     context 'when the metric received is not authorized' do
       context 'and the deny reason is specified' do
-        let(:metric_auth) { [Authorization.new(metric, false, 'disabled')] }
-        include_examples 'authorization to be renewed', '0:disabled'
+        let(:metric_auth) { [Authorization.new(metric, false, 'a_reason')] }
+        include_examples 'authorization to be renewed', '0:a_reason'
       end
 
       context 'and the deny reason is not specified' do

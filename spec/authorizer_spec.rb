@@ -164,13 +164,6 @@ module Xcflushd
         end
       end
 
-      context 'when there is a disabled metric' do
-        reason = described_class.const_get(:DISABLED_METRIC)
-        let(:app_report_usages) { [Usage.new(metric, 'hour', 0, 0)] }
-
-        include_examples 'denied auth', reason
-      end
-
       context 'when the authorization is denied and it is not because limits are exceeded' do
         let(:app_report_usages) { [] }
         let(:reported_metrics) { %w(m1 m2) }
