@@ -142,5 +142,17 @@ module Xcflushd
         expect(subject.send(:current_auths)).to be_empty
       end
     end
+
+    context 'when subscribing to the requests channel fails' do
+      before do
+        allow(subject).to receive(:subscribe_to_requests_channel).and_raise
+      end
+
+      it 'aborts' do
+        expect { subject.start }
+            .to raise_exception(SystemExit)
+            .and output.to_stderr # Do not show the msg when running the tests
+      end
+    end
   end
 end
