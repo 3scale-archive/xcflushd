@@ -33,6 +33,13 @@ module Xcflushd
     REDIS_BATCH_KEYS = 500
     private_constant :REDIS_BATCH_KEYS
 
+    class RenewAuthError < Flusher::XcflushdError
+      def initialize(service_id, user_key)
+        super("Error while renewing the auth for service ID: #{service_id} "\
+              "and user key: #{user_key}")
+      end
+    end
+
     def initialize(storage)
       @storage = storage
     end
@@ -61,6 +68,9 @@ module Xcflushd
       end
 
       set_auth_validity(service_id, user_key, valid_minutes)
+
+    rescue Redis::BaseError
+      raise RenewAuthError.new(service_id, user_key)
     end
 
     def report(reports)
