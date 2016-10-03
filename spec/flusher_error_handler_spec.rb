@@ -55,5 +55,19 @@ module Xcflushd
         expect(logger).to have_received(:warn).with(exception.message)
       end
     end
+
+    describe '#handle_renew_auth_error' do
+      let(:failed_renewal) { { service_id: 's1', user_key: 'uk1' } }
+
+      let(:exception) do
+          described_class.const_get(:STORAGE_ERRORS)[:temp].first
+              .new(failed_renewal[:service_id], failed_renewal[:user_key])
+      end
+
+      it 'logs a warning with the message of the exception received' do
+        subject.handle_renew_auth_error(exception)
+        expect(logger).to have_received(:warn).with(exception.message)
+      end
+    end
   end
 end

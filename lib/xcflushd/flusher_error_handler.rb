@@ -10,11 +10,18 @@ module Xcflushd
                           non_temp: [].freeze }.freeze
     private_constant :AUTHORIZER_ERRORS
 
-    NON_TEMP_ERRORS = (REPORTER_ERRORS[:non_temp] +
-                       AUTHORIZER_ERRORS[:non_temp]).freeze
+    STORAGE_ERRORS = { temp: [Storage::RenewAuthError].freeze,
+                       non_temp: [].freeze}.freeze
+    private_constant :STORAGE_ERRORS
+
+    NON_TEMP_ERRORS = [REPORTER_ERRORS, AUTHORIZER_ERRORS, STORAGE_ERRORS].map do |errors|
+      errors[:non_temp]
+    end.flatten
     private_constant :NON_TEMP_ERRORS
 
-    TEMP_ERRORS = (REPORTER_ERRORS[:temp] + AUTHORIZER_ERRORS[:temp]).freeze
+    TEMP_ERRORS = [REPORTER_ERRORS, AUTHORIZER_ERRORS, STORAGE_ERRORS].map do |errors|
+      errors[:temp]
+    end.flatten
     private_constant :TEMP_ERRORS
 
     def initialize(logger, storage)
@@ -31,6 +38,15 @@ module Xcflushd
     # @param failed_auths [Hash<Auth, Exception>]
     def handle_auth_errors(failed_auths)
       failed_auths.values.each { |exception| log(exception) }
+    end
+
+    # @param exception [Exception]
+    def handle_renew_auth_error(exception)
+      # Failing to renew an authorization in the cache should not be a big
+      # problem. It is probably caused by a temporary issue (like a Redis
+      # connection error) and the auth will probably be successfully renewed
+      # next time. So for now, we just log the error.
+      log(exception)
     end
 
     private
