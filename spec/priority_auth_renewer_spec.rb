@@ -154,5 +154,26 @@ module Xcflushd
             .and output.to_stderr # Do not show the msg when running the tests
       end
     end
+
+    context 'when there is an error publishing the response' do
+      let(:metric_auth) { [Authorization.new(metric, true)] }
+
+      before do
+        allow(redis_pub).to receive(:publish).and_raise
+
+        allow(authorizer)
+            .to receive(:authorizations)
+            .with(service_id, user_key, [metric])
+            .and_return(authorizations)
+
+        subject.start
+        subject.send(:thread_pool).shutdown
+        subject.send(:thread_pool).wait_for_termination
+      end
+
+      it 'logs a warning' do
+        expect(logger).to have_received(:warn)
+      end
+    end
   end
 end
