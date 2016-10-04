@@ -131,6 +131,12 @@ module Xcflushd
           mark_auth_task_as_finished(channel_msg)
         end
 
+        # We only publish a message when there aren't any errors. When
+        # success is false, we could have renewed some auths, so this could
+        # be more fine grained and ping the subscribers that are not interested
+        # in the auths that failed. Also, as we do not publish anything when
+        # there is an error, the subscriber waits until it timeouts.
+        # This is good enough for now, but there is room for improvement.
         publish_auth_repeatedly(metric, metric_auth) if success
       end
     end
