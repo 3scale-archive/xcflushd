@@ -29,15 +29,20 @@ module Xcflushd
     MAX_RANDOM = 1 << 31
     private_constant :MAX_RANDOM
 
+    # Number of times that a response is published
+    TIMES_TO_PUBLISH = 5
+    private_constant :TIMES_TO_PUBLISH
+
     # We need two separate Redis clients: one for subscribing to a channel and
     # the other one to publish to different channels. It is specified in the
     # Redis website: http://redis.io/topics/pubsub
-    def initialize(authorizer, storage, redis_pub, redis_sub, auth_valid_min)
+    def initialize(authorizer, storage, redis_pub, redis_sub, auth_valid_min, logger)
       @authorizer = authorizer
       @storage = storage
       @redis_pub = redis_pub
       @redis_sub = redis_sub
       @auth_valid_min = auth_valid_min
+      @logger = logger
 
       # We can receive several requests to renew the authorization of a metric
       # while we are already renewing it. We want to avoid performing several
@@ -55,24 +60,41 @@ module Xcflushd
     end
 
     def start
-      subscribe_to_requests_channel
+      begin
+        subscribe_to_requests_channel
+      rescue StandardError
+        # If we cannot subscribe, there's no point in running the program.
+        # TODO: Instead of aborting, we should set a flag so the flusher can
+        # exit gracefully. That exit mechanism is not implemented yet.
+        abort('PriorityAuthRenewer cannot subscribe to the requests channel')
+      end
     end
 
     private
 
     attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_valid_min,
-                :current_auths, :random, :thread_pool
+                :logger, :current_auths, :random, :thread_pool
 
     def subscribe_to_requests_channel
       redis_sub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
         on.message do |_channel, msg|
-          # The renew and publish operations need to be done asynchronously.
-          # Renewing the authorizations involves getting them from 3scale,
-          # making networks requests, and also updating Redis. We cannot block
-          # until we get all that done. That is why we need to treat the
-          # messages received in the channel concurrently.
-          unless currently_authorizing?(msg)
-            async_renew_and_publish_task(msg).execute
+          begin
+            # The renew and publish operations need to be done asynchronously.
+            # Renewing the authorizations involves getting them from 3scale,
+            # making networks requests, and also updating Redis. We cannot block
+            # until we get all that done. That is why we need to treat the
+            # messages received in the channel concurrently.
+            unless currently_authorizing?(msg)
+              async_renew_and_publish_task(msg).execute
+            end
+          rescue StandardError => e
+            # If we do not rescue from an exception raised while treating a
+            # message, the redis client instance used stops receiving messages.
+            # We need to make sure that we'll rescue in all cases.
+            # Keep in mind that this will not rescue from exceptions raised in
+            # async tasks because they are executed in different threads.
+            logger.error('Error while treating a message received in the '\
+                         "requests channel: #{e.message}")
           end
         end
       end
@@ -84,36 +106,38 @@ module Xcflushd
     # metrics of an application we also need 1. If the metric received does not
     # have limits defined, we need to perform 2 calls, but still, it is worth
     # to renew all of them for that price.
+    #
+    # Note: Some exceptions can be raised inside the futures that are executed
+    # by the thread pool. For example, when 3scale is not accessible, when
+    # renewing the cached authorizations fails, or when publishing to the
+    # response channels fails. Trying to recover from all those cases does not
+    # seem to be worth it. The request that published the message will wait for
+    # a response that will not arrive and eventually, it will timeout. However,
+    # if the request retries, it is likely to succeed, as the kind of errors
+    # listed above are (hopefully) temporary.
     def async_renew_and_publish_task(channel_msg)
       Concurrent::Future.new(executor: thread_pool) do
-        metric = auth_channel_msg_2_metric(channel_msg)
-        app_auths = app_authorizations(metric)
-        renew(metric[:service_id], metric[:user_key], app_auths)
-        metric_auth = metric_authorization(app_auths, metric[:metric])
-        mark_auth_task_as_finished(channel_msg)
-
-        # There is a race condition here. A task of this type is only executed
-        # when there is not another one renewing the same metric. When there is
-        # another, the incoming request does not trigger a new task, but waits
-        # for the publish below. The request could miss the published message
-        # if events happened in this order:
-        #   1) The request publishes the metric it needs in the requests
-        #      channel.
-        #   2) A new task is not executed, because there is another renewing
-        #      the same metric.
-        #   3) That task publishes the result.
-        #   4) The request subscribes to receive the result, but now it is
-        #      too late.
-        # I cannot think of an easy way to solve this. There is some time
-        # between the moment the requests performs the publish and the
-        # subscribe actions. To mitigate the problem we can publish several
-        # times during some ms. We will see if this is good enough.
-        # Trade-off: publishing too much increases the Redis load. Waiting too
-        # much makes the incoming request slow.
-        5.times do |t|
-          publish_auth(metric, metric_auth)
-          sleep((1.0/50)*((t+1)**2))
+        success = true
+        begin
+          metric = auth_channel_msg_2_metric(channel_msg)
+          app_auths = app_authorizations(metric)
+          renew(metric[:service_id], metric[:user_key], app_auths)
+          metric_auth = metric_authorization(app_auths, metric[:metric])
+        rescue StandardError
+          # If we do not do rescue, we would not be able to process the same
+          # message again.
+          success = false
+        ensure
+          mark_auth_task_as_finished(channel_msg)
         end
+
+        # We only publish a message when there aren't any errors. When
+        # success is false, we could have renewed some auths, so this could
+        # be more fine grained and ping the subscribers that are not interested
+        # in the auths that failed. Also, as we do not publish anything when
+        # there is an error, the subscriber waits until it timeouts.
+        # This is good enough for now, but there is room for improvement.
+        publish_auth_repeatedly(metric, metric_auth) if success
       end
     end
 
@@ -141,6 +165,41 @@ module Xcflushd
     def channel_for_metric(metric)
       "#{AUTH_RESPONSES_CHANNEL_PREFIX}#{metric[:service_id]}:"\
         "#{metric[:user_key]}:#{metric[:metric]}"
+    end
+
+    def publish_auth_repeatedly(metric, authorization)
+      # There is a race condition here. A renew and publish task is only run
+      # when there is not another one renewing the same metric. When there is
+      # another, the incoming request does not trigger a new task, but waits
+      # for the publish below. The request could miss the published message
+      # if events happened in this order:
+      #   1) The request publishes the metric it needs in the requests
+      #      channel.
+      #   2) A new task is not executed, because there is another renewing
+      #      the same metric.
+      #   3) That task publishes the result.
+      #   4) The request subscribes to receive the result, but now it is
+      #      too late.
+      # I cannot think of an easy way to solve this. There is some time
+      # between the moment the requests performs the publish and the
+      # subscribe actions. To mitigate the problem we can publish several
+      # times during some ms. We will see if this is good enough.
+      # Trade-off: publishing too much increases the Redis load. Waiting too
+      # much makes the incoming request slow.
+      publish_failures = 0
+      TIMES_TO_PUBLISH.times do |t|
+        begin
+          publish_auth(metric, authorization)
+        rescue
+          publish_failures += 1
+        end
+        sleep((1.0/50)*((t+1)**2))
+      end
+
+      if publish_failures > 0
+        logger.warn('There was an error while publishing a response in the '\
+                    "priority channel. Metric: #{metric}".freeze)
+      end
     end
 
     def publish_auth(metric, authorization)
