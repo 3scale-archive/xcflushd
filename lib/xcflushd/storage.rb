@@ -89,12 +89,14 @@ module Xcflushd
 
       storage.rename(SET_KEYS_CACHED_REPORTS, SET_KEYS_FLUSHING_REPORTS)
 
-      keys_with_flushing_prefix = flushing_report_keys.map do |key|
+      flushing_reports = flushing_report_keys
+
+      keys_with_flushing_prefix = flushing_reports.map do |key|
         name_key_to_flush(key)
       end
 
       # Hash with old names as keys and new ones as values
-      key_names = Hash[flushing_report_keys.zip(keys_with_flushing_prefix)]
+      key_names = Hash[flushing_reports.zip(keys_with_flushing_prefix)]
       rename(key_names)
 
       key_names.values
