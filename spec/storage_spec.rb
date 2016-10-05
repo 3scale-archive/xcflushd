@@ -4,10 +4,36 @@ require 'xcflushd/storage'
 module Xcflushd
   describe Storage do
     let(:redis) { Redis.new }
-    subject { described_class.new(redis) }
+    let(:logger) { double('logger', warn: true, error: true) }
+    subject { described_class.new(redis, logger) }
+
+    let(:suffix) { '_20160101000000' }
+
+    before do
+      # There are sleeps in the class, but we do not need to wait in the tests.
+      allow_any_instance_of(described_class).to receive(:sleep)
+
+      # The REDIS_BATCH_KEYS constant defines the number of keys that we
+      # send to Redis when using pipelines. These tests are easier to reason
+      # about if we set the constant to 1.
+      stub_const('Xcflushd::Storage::REDIS_BATCH_KEYS', 1)
+
+      # The suffix for unique naming is based on the current time.
+      # To avoid using a library to control time, we'll just stub the method.
+      allow(subject).to receive(:suffix_for_unique_naming).and_return(suffix)
+    end
 
     let(:set_keys_cached_reports) do
       described_class.const_get(:SET_KEYS_CACHED_REPORTS)
+    end
+
+    let(:set_keys_flushing_reports) do
+      described_class.const_get(:SET_KEYS_FLUSHING_REPORTS) + suffix
+    end
+
+    let(:errors) do
+      { retrieving_reports: described_class.const_get(:RETRIEVING_REPORTS_ERROR),
+        some_reports_missing: described_class.const_get(:SOME_REPORTS_MISSING_ERROR) }
     end
 
     renew_auth_error = described_class::RenewAuthError
@@ -32,12 +58,8 @@ module Xcflushd
 
         let(:reports_to_be_flushed_keys) do
           cached_report_keys.map do |key|
-            subject.send(:name_key_to_flush , key)
+            subject.send(:name_key_to_flush , key, suffix)
           end
-        end
-
-        let(:set_keys_flushing_reports) do
-          described_class.const_get(:SET_KEYS_FLUSHING_REPORTS)
         end
 
         before do
@@ -96,6 +118,201 @@ module Xcflushd
         # does not exist. However, using FakeRedis, it simply returns nil.
         it 'returns an empty array' do
           expect(subject.reports_to_flush).to be_empty
+        end
+      end
+
+      # In these tests, we are checking all the steps that might fail.
+      # They are heavily dependent on the Redis commands used.
+      context 'when there is an error' do
+        let(:cached_reports) do
+          [{ service_id: 's1', user_key: 'a1', usage: { 'm1' => '1' } },
+           { service_id: 's2', user_key: 'a2', usage: { 'm1' => '10' } }]
+        end
+
+        let(:cached_report_keys) do
+          cached_reports.map do |cached_report|
+            report_key(cached_report[:service_id], cached_report[:user_key])
+          end
+        end
+
+        let(:reports_to_be_flushed_keys) do
+          cached_report_keys.map do |key|
+            subject.send(:name_key_to_flush , key, suffix)
+          end
+        end
+
+        before do
+          # Store set that contains the keys of the cached reports
+          cached_report_keys.each do |hash|
+            redis.sadd(set_keys_cached_reports, hash)
+          end
+
+          # Store the cached reports as hashes where each metric is a field
+          cached_reports.each do |cached_report|
+            key = report_key(cached_report[:service_id],
+                             cached_report[:user_key])
+            cached_report[:usage].each do |metric, value|
+              redis.hset(key, metric, value)
+            end
+          end
+        end
+
+        context 'checking the cardinality of the set of pending reports' do
+          before do
+            allow(redis)
+                .to receive(:scard)
+                .with(set_keys_cached_reports)
+                .and_raise(Redis::BaseError)
+          end
+
+          it 'logs an error' do
+            subject.reports_to_flush
+            expect(logger).to have_received(:error).with(errors[:retrieving_reports])
+          end
+
+          it 'returns an empty array' do
+            expect(subject.reports_to_flush).to be_empty
+          end
+        end
+
+        context 'renaming the set of pending reports' do
+          before do
+            allow(redis)
+                .to receive(:rename)
+                .with(set_keys_cached_reports, set_keys_flushing_reports)
+                .and_raise(Redis::BaseError)
+          end
+
+          it 'logs an error' do
+            subject.reports_to_flush
+            expect(logger).to have_received(:error).with(errors[:retrieving_reports])
+          end
+
+          it 'returns an empty array' do
+            expect(subject.reports_to_flush).to be_empty
+          end
+        end
+
+        context 'getting the hashes from the renamed set of pending reports' do
+          before do
+            allow(redis)
+                .to receive(:smembers)
+                .with(set_keys_flushing_reports)
+                .and_raise(Redis::BaseError)
+          end
+
+          it 'logs an error' do
+            subject.reports_to_flush
+            expect(logger).to have_received(:error).with(errors[:retrieving_reports])
+          end
+
+          it 'returns an empty array' do
+            expect(subject.reports_to_flush).to be_empty
+          end
+
+          it 'does not delete the renamed set of pending reports, so it can be retrieved later' do
+            subject.reports_to_flush
+            expect(redis.exists(set_keys_flushing_reports)).to be true
+          end
+        end
+
+        context 'renaming a hash of a report to be flushed' do
+          before do
+            # Raise an error only for the first cached report
+            allow(redis)
+                .to receive(:rename)
+                .with(cached_report_keys.first, reports_to_be_flushed_keys.first)
+                .and_raise(Redis::BaseError)
+
+            # Do not raise when renaming the rest of them
+            cached_report_keys[1..-1].each_with_index do |key, i|
+              allow(redis)
+                  .to receive(:rename)
+                  .with(key, reports_to_be_flushed_keys[i + 1])
+                  .and_call_original
+            end
+
+            # Call original method when renaming set of keys of cached reports
+            # (If we do not define this, rspec will complain because 'redis'
+            # received an unexpected message)
+            allow(redis)
+                .to receive(:rename)
+                .with(set_keys_cached_reports, set_keys_flushing_reports)
+                .and_call_original
+          end
+
+          it 'logs an error' do
+            subject.reports_to_flush
+            expect(logger).to have_received(:warn).with(errors[:some_reports_missing])
+          end
+
+          it 'returns all the reports except the ones for which the rename op failed' do
+            # We need to check [1..-1] because we set REDIS_BATCH_KEYS
+            # to 1 above.
+            expect(subject.reports_to_flush)
+                .to match_array cached_reports[1..-1]
+          end
+
+          it 'deletes the renamed set of pending reports' do
+            subject.reports_to_flush
+            expect(redis.exists(set_keys_flushing_reports)).to be false
+          end
+        end
+
+        context 'getting the usage of a cached report' do
+          before do
+            # Raise an error only for the first cached report
+            allow(redis)
+                .to receive(:hgetall)
+                .with(reports_to_be_flushed_keys.first)
+                .and_raise(Redis::BaseError)
+
+            reports_to_be_flushed_keys[1..-1].each do |key|
+              allow(redis).to receive(:hgetall).with(key).and_call_original
+            end
+          end
+
+          it 'logs an error' do
+            subject.reports_to_flush
+            expect(logger).to have_received(:error).with(errors[:some_reports_missing])
+          end
+
+          it 'returns the reports that are in batches where none failed' do
+            # We need to check [1..-1] because we set REDIS_BATCH_KEYS
+            # to 1 above.
+            expect(subject.reports_to_flush)
+                .to match_array cached_reports[1..-1]
+          end
+
+          it 'deletes the renamed set of pending reports' do
+            subject.reports_to_flush
+            expect(redis.exists(set_keys_flushing_reports)).to be false
+          end
+
+          it 'deletes the renamed keys of the reports that did not fail' do
+            subject.reports_to_flush
+            reports_to_be_flushed_keys[1..-1].each do |key|
+              expect(redis.exists(key)).to be false
+            end
+          end
+
+          it 'does not delete the renamed keys of the reports that failed' do
+            subject.reports_to_flush
+            expect(redis.exists(reports_to_be_flushed_keys.first)).to be true
+          end
+        end
+
+        context 'performing the cleanup' do
+          before { allow(redis).to receive(:del).and_raise(Redis::BaseError) }
+
+          it 'logs an error' do
+            subject.reports_to_flush
+            expect(logger).to have_received(:error).at_least(:once)
+          end
+
+          it 'returns the reports to be flushed' do
+            expect(subject.reports_to_flush).to match_array cached_reports
+          end
         end
       end
     end
