@@ -49,6 +49,13 @@ module Xcflushd
           time_remaining_sec = flush_freq_min*60 - flusher_runtime
           sleep(time_remaining_sec) if time_remaining_sec > 0
         end
+      rescue StandardError => e
+        # Let's make sure that we treat all the standard errors to ensure that
+        # the flusher keeps running.
+        logger.error(e)
+      rescue Exception => e
+        logger.error(e)
+        abort
       end
 
     end
