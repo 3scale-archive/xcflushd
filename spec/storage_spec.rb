@@ -10,6 +10,8 @@ module Xcflushd
       described_class.const_get(:SET_KEYS_CACHED_REPORTS)
     end
 
+    renew_auth_error = described_class::RenewAuthError
+
     describe '#reports_to_flush' do
       context 'when there are cached reports' do
         # Usage values could be ints, but Redis would return strings anyway.
@@ -118,30 +120,42 @@ module Xcflushd
           denied_auths_with_a_reason
       end
 
-      it 'renews the authorization of the authorized metrics' do
-        subject.renew_auths(service_id, user_key, authorizations, valid_min)
-        authorized_metrics.each do |metric|
-          expect(redis.hget(auth_hash_key, metric)).to eq '1'
+      context 'when there are no errors' do
+        it 'renews the authorization of the authorized metrics' do
+          subject.renew_auths(service_id, user_key, authorizations, valid_min)
+          authorized_metrics.each do |metric|
+            expect(redis.hget(auth_hash_key, metric)).to eq '1'
+          end
+        end
+
+        it 'renews the authorization of the non-authorized metrics' do
+          subject.renew_auths(service_id, user_key, authorizations, valid_min)
+          non_authorized_metrics.each do |metric|
+            expect(redis.hget(auth_hash_key, metric)).to eq '0'
+          end
+        end
+
+        it 'renews the authorization of denied metrics specifying the reason' do
+          subject.renew_auths(service_id, user_key, authorizations, valid_min)
+          denied_auths_with_a_reason.each do |auth|
+            expect(redis.hget(auth_hash_key, auth.metric)).to eq "0:#{auth.reason}"
+          end
+        end
+
+        it 'sets a TTL for the hash that contains the auths of the application' do
+          subject.renew_auths(service_id, user_key, authorizations, valid_min)
+          expect(redis.ttl(auth_hash_key)).to be_between(0, valid_min*60)
         end
       end
 
-      it 'renews the authorization of the non-authorized metrics' do
-        subject.renew_auths(service_id, user_key, authorizations, valid_min)
-        non_authorized_metrics.each do |metric|
-          expect(redis.hget(auth_hash_key, metric)).to eq '0'
-        end
-      end
+      context 'when there is an error' do
+        # Fake redis error in any method that the client receives.
+        before { allow(redis).to receive(:hset).and_raise(Redis::BaseError) }
 
-      it 'renews the authorization of denied metrics specifying the reason' do
-        subject.renew_auths(service_id, user_key, authorizations, valid_min)
-        denied_auths_with_a_reason.each do |auth|
-          expect(redis.hget(auth_hash_key, auth.metric)).to eq "0:#{auth.reason}"
+        it "raises a #{renew_auth_error}" do
+          expect { subject.renew_auths(service_id, user_key, authorizations, valid_min) }
+              .to raise_error(renew_auth_error)
         end
-      end
-
-      it 'sets a TTL for the hash that contains the auths of the application' do
-        subject.renew_auths(service_id, user_key, authorizations, valid_min)
-        expect(redis.ttl(auth_hash_key)).to be_between(0, valid_min*60)
       end
     end
 

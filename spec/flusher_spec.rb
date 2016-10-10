@@ -15,7 +15,8 @@ module Xcflushd
     let(:error_handler) do
       double('error_handler',
              :handle_report_errors => true,
-             :handle_auth_errors => true)
+             :handle_auth_errors => true,
+             :handle_renew_auth_error => true)
     end
 
     subject do
@@ -172,6 +173,27 @@ module Xcflushd
                     ok_auth_report[:user_key],
                     auths_for_ok_report,
                     auth_valid_min)
+        end
+      end
+
+      context 'when there is an error while renewing the authorizations' do
+        let(:report_with_failed_renew_auth) do
+          { service_id: 's1', user_key: 'uk1', usage: { 'hits' => 1 } }
+        end
+
+        let(:pending_reports) { [report_with_failed_renew_auth] }
+
+        before do
+          allow(storage)
+              .to receive(:renew_auths)
+              .and_raise(Storage::RenewAuthError.new(
+                  report_with_failed_renew_auth[:service_id],
+                  report_with_failed_renew_auth[:user_key]))
+        end
+
+        it 'handles the error' do
+          subject.flush
+          expect(error_handler).to have_received(:handle_renew_auth_error)
         end
       end
     end

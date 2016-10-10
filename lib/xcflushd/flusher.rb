@@ -83,10 +83,14 @@ module Xcflushd
 
     def renew(authorizations)
       authorizations.each do |authorization|
-        storage.renew_auths(authorization[:service_id],
-                            authorization[:user_key],
-                            authorization[:auths],
-                            auth_valid_min)
+        begin
+          storage.renew_auths(authorization[:service_id],
+                              authorization[:user_key],
+                              authorization[:auths],
+                              auth_valid_min)
+        rescue Storage::RenewAuthError => e
+          error_handler.handle_renew_auth_error(e)
+        end
       end
     end
 
