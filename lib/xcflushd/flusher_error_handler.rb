@@ -59,14 +59,19 @@ module Xcflushd
     # On the other hand, for errors that are likely to be temporary, like when
     # we could not connect with 3scale, we log a warning.
     def log(exception)
+      msg = error_msg(exception)
       case exception
         when *NON_TEMP_ERRORS
-          logger.error(exception.message)
+          logger.error(msg)
         when *TEMP_ERRORS
-          logger.warn(exception.message)
+          logger.warn(msg)
         else
-          logger.error(exception.message)
+          logger.error(msg)
       end
+    end
+
+    def error_msg(exception)
+      "#{exception.message} Cause: #{exception.cause || '-'.freeze}"
     end
 
   end
