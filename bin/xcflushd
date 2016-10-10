@@ -6,10 +6,10 @@ require 'xcflushd/runner'
 include GLI::App
 
 def start_xcflusher(options)
-  int_opt_fields = [:threescale_port, :redis_port,
-                    :auth_valid_minutes, :reporting_freq_minutes]
+  int_opt_fields = [:'threescale-port', :'redis-port',
+                    :'auth-valid-minutes', :'reporting-freq-minutes']
   int_opt_fields.each { |opt| options[opt] = options[opt].to_i }
-  Xcflushd::Runner.run(options)
+  Xcflushd::Runner.run(Hash[options.map { |k, v| [k.gsub('-', '_'), v] }])
 end
 
 program_desc 'XC flush daemon'
@@ -23,41 +23,41 @@ desc 'Starts the daemon'
 arg_name 'Describe arguments to run here'
 command :run do |c|
   c.desc 'Redis host'
-  c.flag :redis_host
+  c.flag :'redis-host'
 
   c.desc 'Redis port'
-  c.flag :redis_port
+  c.flag :'redis-port'
 
   c.desc '3scale backend host'
-  c.flag :threescale_host
+  c.flag :'threescale-host'
 
   c.desc '3scale backend port'
-  c.flag :threescale_port, default_value: 80
+  c.flag :'threescale-port', default_value: 80
 
   c.desc '3scale provider key'
-  c.flag :provider_key
+  c.flag :'provider-key'
 
   c.desc 'Validity of authorizations (in minutes)'
-  c.flag :auth_valid_minutes
+  c.flag :'auth-valid-minutes'
 
   c.desc 'Reporting frequency (in minutes)'
-  c.flag :reporting_freq_minutes
+  c.flag :'reporting-freq-minutes'
 
   c.desc 'Daemonize'
   c.switch :daemonize
 
   c.action do |_global_options, options, _args|
-    [:threescale_host,
-     :provider_key,
-     :redis_host,
-     :redis_port,
-     :auth_valid_minutes,
-     :reporting_freq_minutes].each do |opt|
+    [:'threescale-host',
+     :'provider-key',
+     :'redis-host',
+     :'redis-port',
+     :'auth-valid-minutes',
+     :'reporting-freq-minutes'].each do |opt|
       help_now!("#{opt} is required") unless options[opt]
     end
 
-    if options[:reporting_freq_minutes].to_i >= options[:auth_valid_minutes].to_i
-      exit_now!('reporting_freq_minutes needs to be <= auth_valid_minutes. '\
+    if options[:'reporting-freq-minutes'].to_i >= options[:'auth-valid-minutes'].to_i
+      exit_now!('reporting-freq-minutes needs to be <= auth-valid-minutes. '\
                 'Otherwise, auths would be renewed without taking into '\
                 'account the new reports.')
     end
