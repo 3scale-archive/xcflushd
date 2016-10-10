@@ -10,14 +10,14 @@ module Xcflushd
       def run(opts = {})
         redis = Redis.new(
             host: opts[:redis_host], port: opts[:redis_port], driver: :hiredis)
-        storage = Storage.new(redis)
+        logger = Logger.new(STDOUT)
+        storage = Storage.new(redis, logger)
         threescale = ThreeScale::Client.new(provider_key: opts[:provider_key],
                                             host: opts[:threescale_host],
                                             port: opts[:threescale_port],
                                             persistent: true)
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)
-        logger = Logger.new(STDOUT)
         error_handler = FlusherErrorHandler.new(logger, storage)
         flusher = Flusher.new(
             reporter, authorizer, storage, opts[:auth_valid_minutes], error_handler)

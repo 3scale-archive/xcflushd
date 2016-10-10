@@ -12,11 +12,11 @@ module Xcflushd
   describe PriorityAuthRenewer do
     let(:authorizer) { double('authorizer') }
     let(:redis_storage) { Redis.new }
-    let(:storage) { Storage.new(redis_storage) }
+    let(:logger) { double('logger', warn: true, error: true) }
+    let(:storage) { Storage.new(redis_storage, logger) }
     let(:redis_pub) { Redis.new }
     let(:redis_sub) { Redis.new }
     let(:auth_valid_min) { 10 }
-    let(:logger) { double('logger', warn: true, error: true) }
 
     subject do
       described_class.new(
