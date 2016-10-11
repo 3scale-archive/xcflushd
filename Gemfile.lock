@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     xcflushd (0.1.0)
-      3scale_client (= 2.8.0)
+      3scale_client (= 2.8.1)
       concurrent-ruby (= 1.0.2)
       daemons (= 1.2.4)
       gli (= 2.14.0)
@@ -13,7 +13,7 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    3scale_client (2.8.0)
+    3scale_client (2.8.1)
       nokogiri
     concurrent-ruby (1.0.2)
     daemons (1.2.4)
@@ -26,10 +26,8 @@ GEM
     json (2.0.2)
     mini_portile2 (2.1.0)
     net-http-persistent (2.9.4)
-    nokogiri (1.6.8)
+    nokogiri (1.6.8.1)
       mini_portile2 (~> 2.1.0)
-      pkg-config (~> 1.1.7)
-    pkg-config (1.1.7)
     rake (11.2.2)
     redis (3.3.1)
     rspec (3.5.0)
