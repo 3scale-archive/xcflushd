@@ -9,7 +9,7 @@ def start_xcflusher(options)
   int_opt_fields = [:'threescale-port', :'redis-port',
                     :'auth-valid-minutes', :'reporting-freq-minutes']
   int_opt_fields.each { |opt| options[opt] = options[opt].to_i }
-  Xcflushd::Runner.run(Hash[options.map { |k, v| [k.gsub('-', '_'), v] }])
+  Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
 end
 
 program_desc 'XC flush daemon'
