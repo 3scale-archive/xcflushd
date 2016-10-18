@@ -30,7 +30,7 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = '>= 2.1.0'
 
-  spec.add_runtime_dependency "3scale_client", "= 2.8.1"
+  spec.add_runtime_dependency "3scale_client", "= 2.8.2"
   spec.add_runtime_dependency "gli", "= 2.14.0"
   spec.add_runtime_dependency "redis", "= 3.3.1"
   spec.add_runtime_dependency "hiredis", "= 0.6.1"
