@@ -115,11 +115,9 @@ module Xcflushd
     end
 
     def with_3scale_error_rescue(service_id, user_key)
-      begin
-        yield
-      rescue ThreeScale::ServerError
-        raise ThreeScaleInternalError.new(service_id, user_key)
-      end
+      yield
+    rescue ThreeScale::ServerError
+      raise ThreeScaleInternalError.new(service_id, user_key)
     end
   end
 end
