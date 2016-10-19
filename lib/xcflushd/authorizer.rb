@@ -38,10 +38,7 @@ module Xcflushd
         threescale_client.authorize(service_id: service_id, user_key: user_key)
       end
 
-      # Sometimes error_code is nil when usage limits are exceeded ¯\_(ツ)_/¯.
-      # That's why we check both error_code and error_message.
-      if !auth.success? && !(auth.error_code == 'limits_exceeded'.freeze ||
-          auth.error_message == 'usage limits are exceeded'.freeze)
+      if denied_but_not_because_limits?(auth)
         return reported_metrics.map do |metric|
           Authorization.new(metric, false, auth.error_code)
         end
@@ -93,6 +90,13 @@ module Xcflushd
 
     def next_hit_auth?(limits)
       limits.all? { |limit| limit.current_value + 1 <= limit.max_value }
+    end
+
+    def denied_but_not_because_limits?(auth)
+      # Sometimes error_code is nil when usage limits are exceeded ¯\_(ツ)_/¯.
+      # That's why we check both error_code and error_message.
+      !auth.success? && !(auth.error_code == 'limits_exceeded'.freeze ||
+          auth.error_message == 'usage limits are exceeded'.freeze)
     end
 
     def with_3scale_error_rescue(service_id, user_key)
