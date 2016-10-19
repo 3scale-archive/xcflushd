@@ -23,6 +23,7 @@ module Xcflushd
       let(:user_key) { 'a_user_key' }
       let(:metric) { 'a_metric' }
       let(:reported_metrics) { [metric] }
+      let(:metrics_hierarchy) { {} } # Default. Only 1 metric without children.
 
       # Default authorized response. Overwritten in cases where auth is denied.
       let(:authorize_response) do
@@ -30,7 +31,8 @@ module Xcflushd
                success?: true,
                error_code: nil,
                error_message: nil,
-               usage_reports: app_report_usages)
+               usage_reports: app_report_usages,
+               hierarchy: metrics_hierarchy)
       end
 
       let(:denied_auth_response_limits_exceeded) do
@@ -38,7 +40,8 @@ module Xcflushd
                success?: false,
                error_code: limits_exceeded_code,
                error_message: limits_exceeded_msg,
-               usage_reports: app_report_usages)
+               usage_reports: app_report_usages,
+               hierarchy: metrics_hierarchy)
       end
 
       before do
@@ -63,6 +66,21 @@ module Xcflushd
           auth = subject.authorizations(service_id, user_key, reported_metrics).first
           expect(auth.metric).to eq metric
           expect(auth.authorized?).to be true
+        end
+      end
+
+      shared_examples 'app with hierarchies defined' do |reported_metrics, expected_auths|
+        it 'returns the correct authorization status for each metric' do
+          auths = subject.authorizations(service_id, user_key, reported_metrics)
+          expect(auths.size).to eq expected_auths.size
+
+          expect(expected_auths.all? do |auth|
+            auths.any? do |m|
+              m.metric == auth[:metric] &&
+                  m.authorized? == auth[:authorized] &&
+                  m.reason == auth[:reason]
+            end
+          end).to be true
         end
       end
 
@@ -157,12 +175,6 @@ module Xcflushd
           include_examples 'app with authorized metric'
         end
 
-        context 'and the metric is not authorized because of usage limits exceeded' do
-          reason = 'limits_exceeded'
-          let(:authorize_response) { denied_auth_response_limits_exceeded }
-          include_examples 'denied auth', reason
-        end
-
         context 'and the metric is not authorized for a reason other than limits exceeded' do
           reason = 'some_reason'
           let(:authorize_response) do
@@ -204,44 +216,104 @@ module Xcflushd
       end
 
       context 'when authorizing against 3scale fails' do
-        context 'while authorizing the limited metrics' do
-          let(:app_report_usages) { [] } # Does not matter. It's going to raise
+        let(:app_report_usages) { [] } # Does not matter. It's going to raise
 
-          before do
-            allow(threescale_client)
-                .to receive(:authorize)
-                .with({ service_id: service_id, user_key: user_key })
-                .and_raise(ThreeScale::ServerError.new('error_msg'))
-          end
-
-          it "raises #{threescale_internal_error}" do
-            expect { subject.authorizations(service_id, user_key, reported_metrics) }
-                .to raise_error threescale_internal_error
-          end
+        before do
+          allow(threescale_client)
+              .to receive(:authorize)
+              .with({ service_id: service_id, user_key: user_key })
+              .and_raise(ThreeScale::ServerError.new('error_msg'))
         end
 
-        context 'while authorizing a non-limited metric' do
-          let(:metric) { 'a_non_limited_metric' }
-          let(:reported_metrics) { [metric] }
+        it "raises #{threescale_internal_error}" do
+          expect { subject.authorizations(service_id, user_key, reported_metrics) }
+              .to raise_error threescale_internal_error
+        end
+      end
 
-          # No usages because there is only 1 metric, and it is not limited
-          let(:app_report_usages) { [] }
+      context 'when there is a metric hierarchy defined in the authorization' do
+        # We define 3 children to take into account all possible scenarios:
+        # 1) limits exceeded, 2) limits not exceeded, 3) no limits.
+        # For theses tests, its convenient to define the parent and children
+        # metrics both in vars and lets. We need the vars because of the
+        # restrictions about what can be sent as params to 'include_examples'
+        # blocks.
+        parent = 'a_parent'
+        children = { limits_exceeded: 'c1', limits_not_exceeded: 'c2', unlimited: 'c3' }
 
-          before do
-            # Raise only when authorizing the non-limited metric. This case can
-            # be distinguished because it sends a predicted usage to the call.
-            allow(threescale_client)
-                .to receive(:authorize)
-                .with({ service_id: service_id,
-                        user_key: user_key,
-                        usage: { metric => 1 } })
-                .and_raise(ThreeScale::ServerError.new('error_msg'))
+        let(:parent) { parent }
+        let(:children) { children }
+
+        let(:metrics_hierarchy) { { parent => children.values } }
+
+        context 'and the parent metric usage is over the limits' do
+          let(:app_report_usages) do
+            [Usage.new(parent, 'hour', 11, 10),
+             Usage.new(children[:limits_exceeded], 'hour', 5, 1),
+             Usage.new(children[:limits_not_exceeded], 'hour', 6, 10)]
           end
 
-          it "raises #{threescale_internal_error}" do
-            expect { subject.authorizations(service_id, user_key, reported_metrics) }
-                .to raise_error threescale_internal_error
+          expected_auths = ([parent] + children.values).map do |metric|
+            { metric: metric, authorized: false, reason: 'limits_exceeded' }
           end
+
+          # The parent is limited, so it will have usage reports.
+          # In this case, all the metrics are going to be verified no matter
+          # what we report.
+          reported_metrics = []
+          include_examples 'app with hierarchies defined', reported_metrics, expected_auths
+        end
+
+        context 'and the parent metric usage is not over the limits' do
+          let(:app_report_usages) do
+            [Usage.new(parent, 'hour', 1, 10),
+             Usage.new(children[:limits_exceeded], 'hour', 1, 0),
+             Usage.new(children[:limits_not_exceeded], 'hour', 0, 10)]
+          end
+
+          expected_auths =
+              [{ metric: parent, authorized: true, reason: nil },
+               { metric: children[:limits_exceeded],
+                 authorized: false,
+                 reason: 'limits_exceeded' },
+               { metric: children[:limits_not_exceeded], authorized: true, reason: nil }]
+
+          # The parent is limited, so it will have usage reports.
+          # In this case, all the metrics are going to be verified no matter
+          # what we report.
+          reported_metrics = []
+          include_examples 'app with hierarchies defined', reported_metrics, expected_auths
+        end
+
+        context 'and the parent metric does not have a limit' do
+          let(:app_report_usages) do
+            [Usage.new(children[:limits_exceeded], 'hour', 1, 0),
+             Usage.new(children[:limits_not_exceeded], 'hour', 0, 10)]
+          end
+
+          # Reminder: the 3scale_client gem does not return a parent metric in
+          # the hierarchy if it is not limited.
+          let(:metrics_hierarchy) { {} }
+
+          expected_auths =
+              [{ metric: children[:limits_exceeded],
+                 authorized: false,
+                 reason: 'limits_exceeded' },
+               { metric: children[:limits_not_exceeded], authorized: true, reason: nil }]
+
+          # In this case, the parent is not limited, which means that it does
+          # not have an associated usage report. The reported metrics matter
+          # in this case. The auth of the parent is not going to be checked if
+          # we do not report it. The same happens for the other non-limited metric
+          reported_metrics = []
+          include_examples 'app with hierarchies defined', reported_metrics, expected_auths
+
+          expected_auths +=
+              [{ metric: parent, authorized: true, reason: nil },
+               { metric: children[:limits_not_exceeded], authorized: true, reason: nil }]
+
+          reported_metrics = [parent, children[:unlimited]]
+          include_examples 'app with hierarchies defined', reported_metrics, expected_auths
         end
       end
     end
