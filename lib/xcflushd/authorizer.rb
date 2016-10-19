@@ -54,8 +54,8 @@ module Xcflushd
 
     attr_reader :threescale_client
 
-    def next_hit_auth?(limits)
-      limits.all? { |limit| limit.current_value + 1 <= limit.max_value }
+    def next_hit_auth?(usages)
+      usages.all? { |usage| usage.current_value + 1 <= usage.max_value }
     end
 
     def denied_but_not_because_limits?(auth)
