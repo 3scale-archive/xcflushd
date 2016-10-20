@@ -10,6 +10,14 @@ module Xcflushd
 
     threescale_internal_error = described_class::ThreeScaleInternalError
 
+    let(:limits_exceeded_code) do
+      described_class.const_get(:LIMITS_EXCEEDED_CODE)
+    end
+
+    let(:limits_exceeded_msg) do
+      described_class.const_get(:LIMITS_EXCEEDED_MSG)
+    end
+
     describe '#authorizations' do
       let(:service_id) { 'a_service_id' }
       let(:user_key) { 'a_user_key' }
@@ -28,8 +36,8 @@ module Xcflushd
       let(:denied_auth_response_limits_exceeded) do
         double('auth_response',
                success?: false,
-               error_code: 'limits_exceeded',
-               error_message: 'usage limits are exceeded',
+               error_code: limits_exceeded_code,
+               error_message: limits_exceeded_msg,
                usage_reports: app_report_usages)
       end
 
@@ -124,7 +132,9 @@ module Xcflushd
 
           unauthorized_metrics.each do |metric|
             expect(auths.any? do |auth|
-              auth.metric == metric && !auth.authorized? && auth.reason == 'limits_exceeded'
+              auth.metric == metric &&
+                  !auth.authorized? &&
+                  auth.reason == limits_exceeded_code
             end).to be true
           end
         end
