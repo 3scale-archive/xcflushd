@@ -55,10 +55,11 @@ module Xcflushd
         end
 
         let(:authorizations) do
-          { app1: [Authorization.new('m1', true),
-                   Authorization.new('m2', false)],
-            app2: [Authorization.new('m3', false),
-                   Authorization.new('m4', true)] }
+          { app1: { 'm1' => Authorization.ok!,
+                    'm2' => Authorization.denied! },
+            app2: { 'm3' => Authorization.denied!,
+                    'm4' => Authorization.ok! }
+          }
         end
 
         let(:pending_reports) do
@@ -139,7 +140,7 @@ module Xcflushd
 
         let(:pending_reports) { [failed_auth_report, ok_auth_report] }
         let(:exception) { RuntimeError.new }
-        let(:auths_for_ok_report) { [Authorization.new('hits', true)] }
+        let(:auths_for_ok_report) { { 'hits' => Authorization.ok! } }
 
         before do
           allow(authorizer)
