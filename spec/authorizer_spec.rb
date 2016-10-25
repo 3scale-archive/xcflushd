@@ -1,5 +1,6 @@
 require 'spec_helper'
 require 'xcflushd/authorizer'
+require 'xcflushd/authorization'
 
 module Xcflushd
   describe Authorizer do
@@ -10,14 +11,6 @@ module Xcflushd
 
     threescale_internal_error = described_class::ThreeScaleInternalError
 
-    let(:limits_exceeded_code) do
-      described_class.const_get(:LIMITS_EXCEEDED_CODE)
-    end
-
-    let(:limits_exceeded_msg) do
-      described_class.const_get(:LIMITS_EXCEEDED_MSG)
-    end
-
     describe '#authorizations' do
       let(:service_id) { 'a_service_id' }
       let(:user_key) { 'a_user_key' }
@@ -25,12 +18,15 @@ module Xcflushd
       let(:reported_metrics) { [metric] }
       let(:metrics_hierarchy) { {} } # Default. Only 1 metric without children.
 
+      let(:app_report_usages) { [] } # default app report usages
+
       # Default authorized response. Overwritten in cases where auth is denied.
       let(:authorize_response) do
         double('auth_response',
                success?: true,
                error_code: nil,
                error_message: nil,
+               limits_exceeded?: false,
                usage_reports: app_report_usages,
                hierarchy: metrics_hierarchy)
       end
@@ -38,8 +34,8 @@ module Xcflushd
       let(:denied_auth_response_limits_exceeded) do
         double('auth_response',
                success?: false,
-               error_code: limits_exceeded_code,
-               error_message: limits_exceeded_msg,
+               error_code: Authorization.const_get(:LIMITS_EXCEEDED_CODE),
+               limits_exceeded?: true,
                usage_reports: app_report_usages,
                hierarchy: metrics_hierarchy)
       end
@@ -54,39 +50,34 @@ module Xcflushd
       # These shared_examples only apply when there only 1 metric is reported
       shared_examples 'denied auth' do |reason|
         it 'returns a denied authorization that includes the reason' do
-          auth = subject.authorizations(service_id, user_key, reported_metrics).first
-          expect(auth.metric).to eq metric
-          expect(auth.authorized?).to be false
-          expect(auth.reason).to eq reason
+          auth = subject.authorizations(service_id, user_key, reported_metrics)
+          expect(auth[metric]).to eq Authorization.deny(reason)
         end
       end
 
       shared_examples 'app with authorized metric' do
         it 'returns an accepted authorization' do
-          auth = subject.authorizations(service_id, user_key, reported_metrics).first
-          expect(auth.metric).to eq metric
-          expect(auth.authorized?).to be true
+          auth = subject.authorizations(service_id, user_key, reported_metrics)
+          expect(auth[metric]).to eq Authorization.allow
         end
       end
 
       shared_examples 'app with hierarchies defined' do |reported_metrics, expected_auths|
         it 'returns the correct authorization status for each metric' do
           auths = subject.authorizations(service_id, user_key, reported_metrics)
-          expect(auths.size).to eq expected_auths.size
-
-          expect(expected_auths.all? do |auth|
-            auths.any? do |m|
-              m.metric == auth[:metric] &&
-                  m.authorized? == auth[:authorized] &&
-                  m.reason == auth[:reason]
-            end
-          end).to be true
+          expect(auths).to eq expected_auths
         end
+      end
+
+      it 'returns one auth per reported metric' do
+        auths = subject.authorizations(service_id, user_key, reported_metrics)
+
+        expect(auths.size).to eq reported_metrics.size
       end
 
       context 'when the authorization is denied because of usage limits exceeded' do
         let(:authorize_response) { denied_auth_response_limits_exceeded }
-        reason = 'limits_exceeded'
+        reason = Authorization.const_get(:LIMITS_EXCEEDED_CODE)
 
         context 'because the usage in any period that is the same as the limit' do
           let(:app_report_usages) do
@@ -142,25 +133,18 @@ module Xcflushd
 
         it 'returns the correct authorization status for all of them' do
           auths = subject.authorizations(service_id, user_key, reported_metrics)
-
-          authorized_metrics.each do |metric|
-            expect(auths.any? { |auth| auth.metric == metric && auth.authorized? })
-                .to be true
+          expected_auths = authorized_metrics.map do |metric|
+            [metric, Authorization.allow]
+          end + unauthorized_metrics.map do |metric|
+            [metric, Authorization.deny_over_limits]
           end
 
-          unauthorized_metrics.each do |metric|
-            expect(auths.any? do |auth|
-              auth.metric == metric &&
-                  !auth.authorized? &&
-                  auth.reason == limits_exceeded_code
-            end).to be true
-          end
+          expect(auths).to contain_exactly(*expected_auths)
         end
       end
 
       context 'when there is a non-limited metric that has been reported' do
         let(:reported_metrics) { [metric] }
-        let(:app_report_usages) { [] } # Only limited metrics have reports
 
         before do
           allow(threescale_client)
@@ -179,7 +163,9 @@ module Xcflushd
           reason = 'some_reason'
           let(:authorize_response) do
             double('auth_response',
-                   success?: false, error_code: reason, error_message: 'msg')
+                   success?: false, error_code: reason, error_message: 'msg',
+                   limits_exceeded?: false
+                  )
           end
 
           include_examples 'denied auth', reason
@@ -187,12 +173,13 @@ module Xcflushd
       end
 
       context 'when the authorization is denied and it is not because limits are exceeded' do
-        let(:app_report_usages) { [] }
         let(:reported_metrics) { %w(m1 m2) }
         let(:reason) { 'a_deny_reason' }
         let(:auth_response) do
           double('auth_response',
-                 success?: false, error_code: reason, error_message: 'msg')
+                 success?: false, error_code: reason, error_message: 'msg',
+                 limits_exceeded?: false
+                )
         end
 
         before do
@@ -204,20 +191,13 @@ module Xcflushd
 
         it 'returns a denied auth for each of the reported metrics' do
           auths = subject.authorizations(service_id, user_key, reported_metrics)
+          denied_auth = Authorization.deny(reason)
 
-          expect(auths.size).to eq reported_metrics.size
-
-          reported_metrics.each do |metric|
-            expect(auths.any? do |m|
-              m.metric == metric && !m.authorized? && m.reason == reason
-            end).to be true
-          end
+          expect(auths).to contain_exactly(*reported_metrics.map { |m| [m,denied_auth] })
         end
       end
 
       context 'when authorizing against 3scale fails' do
-        let(:app_report_usages) { [] } # Does not matter. It's going to raise
-
         before do
           allow(threescale_client)
               .to receive(:authorize)
@@ -247,14 +227,16 @@ module Xcflushd
         let(:metrics_hierarchy) { { parent => children.values } }
 
         context 'and the parent metric usage is over the limits' do
+          let(:authorize_response) { denied_auth_response_limits_exceeded }
           let(:app_report_usages) do
             [Usage.new(parent, 'hour', 11, 10),
              Usage.new(children[:limits_exceeded], 'hour', 5, 1),
              Usage.new(children[:limits_not_exceeded], 'hour', 6, 10)]
           end
 
-          expected_auths = ([parent] + children.values).map do |metric|
-            { metric: metric, authorized: false, reason: 'limits_exceeded' }
+          expected_auths = ([parent] + children.values).inject({}) do |acc, metric|
+            acc[metric] = Authorization.deny_over_limits
+            acc
           end
 
           # The parent is limited, so it will have usage reports.
@@ -265,18 +247,18 @@ module Xcflushd
         end
 
         context 'and the parent metric usage is not over the limits' do
+          let(:authorize_response) { denied_auth_response_limits_exceeded }
           let(:app_report_usages) do
             [Usage.new(parent, 'hour', 1, 10),
              Usage.new(children[:limits_exceeded], 'hour', 1, 0),
              Usage.new(children[:limits_not_exceeded], 'hour', 0, 10)]
           end
 
-          expected_auths =
-              [{ metric: parent, authorized: true, reason: nil },
-               { metric: children[:limits_exceeded],
-                 authorized: false,
-                 reason: 'limits_exceeded' },
-               { metric: children[:limits_not_exceeded], authorized: true, reason: nil }]
+          expected_auths = {
+            parent => Authorization.allow,
+            children[:limits_exceeded] => Authorization.deny_over_limits,
+            children[:limits_not_exceeded] => Authorization.allow
+          }
 
           # The parent is limited, so it will have usage reports.
           # In this case, all the metrics are going to be verified no matter
@@ -286,6 +268,7 @@ module Xcflushd
         end
 
         context 'and the parent metric does not have a limit' do
+          let(:authorize_response) { denied_auth_response_limits_exceeded }
           let(:app_report_usages) do
             [Usage.new(children[:limits_exceeded], 'hour', 1, 0),
              Usage.new(children[:limits_not_exceeded], 'hour', 0, 10)]
@@ -295,11 +278,10 @@ module Xcflushd
           # the hierarchy if it is not limited.
           let(:metrics_hierarchy) { {} }
 
-          expected_auths =
-              [{ metric: children[:limits_exceeded],
-                 authorized: false,
-                 reason: 'limits_exceeded' },
-               { metric: children[:limits_not_exceeded], authorized: true, reason: nil }]
+          expected_auths = {
+            children[:limits_exceeded] => Authorization.deny_over_limits,
+            children[:limits_not_exceeded] => Authorization.allow
+          }
 
           # In this case, the parent is not limited, which means that it does
           # not have an associated usage report. The reported metrics matter
@@ -308,9 +290,12 @@ module Xcflushd
           reported_metrics = []
           include_examples 'app with hierarchies defined', reported_metrics, expected_auths
 
-          expected_auths +=
-              [{ metric: parent, authorized: true, reason: nil },
-               { metric: children[:limits_not_exceeded], authorized: true, reason: nil }]
+          # note we don't just merge! it (would overwrite value for the previous
+          # include_examples and break, since the examples are run later).
+          expected_auths = expected_auths.merge({
+            parent => Authorization.allow,
+            children[:unlimited] => Authorization.allow
+          })
 
           reported_metrics = [parent, children[:unlimited]]
           include_examples 'app with hierarchies defined', reported_metrics, expected_auths
