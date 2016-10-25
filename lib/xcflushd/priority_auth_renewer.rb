@@ -122,7 +122,7 @@ module Xcflushd
           metric = auth_channel_msg_2_metric(channel_msg)
           app_auths = app_authorizations(metric)
           renew(metric[:service_id], metric[:user_key], app_auths)
-          metric_auth = metric_authorization(app_auths, metric[:metric])
+          metric_auth = app_auths[metric[:metric]]
         rescue StandardError
           # If we do not do rescue, we would not be able to process the same
           # message again.
@@ -156,10 +156,6 @@ module Xcflushd
 
     def renew(service_id, user_key, auths)
       storage.renew_auths(service_id, user_key, auths, auth_valid_min)
-    end
-
-    def metric_authorization(app_auths, metric)
-      app_auths.find { |auth| auth.metric == metric }
     end
 
     def channel_for_metric(metric)
