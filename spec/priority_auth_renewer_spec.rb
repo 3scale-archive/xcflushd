@@ -41,9 +41,9 @@ module Xcflushd
     end
 
     let(:other_app_metrics_auths) do
-      [Authorization.new('metric2', true), Authorization.new('metric3', true)]
+      { 'metric2' => Authorization.ok!, 'metric3' => Authorization.ok! }
     end
-    let(:authorizations) { metric_auth + other_app_metrics_auths }
+    let(:authorizations) { metric_auth.merge(other_app_metrics_auths) }
 
     before do
       # We need to wait in the code, but not here in the tests.
@@ -66,10 +66,10 @@ module Xcflushd
       end
 
       it 'renews the auth for all the limited metrics of the app' do
-        other_app_metrics_auths.each do |metric_auth|
+        other_app_metrics_auths.each do |other_metric, other_auth|
           cached_auth = redis_storage.hget(
-              "auth:#{service_id}:#{user_key}", metric_auth.metric)
-          expect(cached_auth).to eq(metric_auth.authorized? ? '1' : '0')
+              "auth:#{service_id}:#{user_key}", other_metric)
+          expect(cached_auth).to eq(other_auth.authorized? ? '1' : '0')
         end
       end
 
@@ -96,18 +96,18 @@ module Xcflushd
       end
 
       context 'and the metric received is authorized' do
-        let(:metric_auth) { [Authorization.new(metric, true)] }
+        let(:metric_auth) { { metric => Authorization.ok! } }
         include_examples 'authorization to be renewed', '1'
       end
 
       context 'and the metric received is not authorized' do
         context 'and the deny reason is specified' do
-          let(:metric_auth) { [Authorization.new(metric, false, 'a_reason')] }
+          let(:metric_auth) { { metric => Authorization.denied!('a_reason') } }
           include_examples 'authorization to be renewed', '0:a_reason'
         end
 
         context 'and the deny reason is not specified' do
-          let(:metric_auth) { [Authorization.new(metric, false)] }
+          let(:metric_auth) { { metric => Authorization.denied! } }
           include_examples 'authorization to be renewed', '0'
         end
       end
@@ -156,7 +156,7 @@ module Xcflushd
     end
 
     context 'when there is an error publishing the response' do
-      let(:metric_auth) { [Authorization.new(metric, true)] }
+      let(:metric_auth) { { metric => Authorization.ok! } }
 
       before do
         allow(redis_pub).to receive(:publish).and_raise
@@ -165,13 +165,12 @@ module Xcflushd
             .to receive(:authorizations)
             .with(service_id, user_key, [metric])
             .and_return(authorizations)
-
-        subject.start
-        subject.send(:thread_pool).shutdown
-        subject.send(:thread_pool).wait_for_termination
       end
 
       it 'logs a warning' do
+        subject.start
+        subject.send(:thread_pool).shutdown
+        subject.send(:thread_pool).wait_for_termination
         expect(logger).to have_received(:warn)
       end
     end
