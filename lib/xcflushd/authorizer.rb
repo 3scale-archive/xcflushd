@@ -3,14 +3,6 @@ require '3scale_client'
 module Xcflushd
   class Authorizer
 
-    # These 2 constants are defined according to what 3scale backend returns in
-    # the response of authorize calls.
-    LIMITS_EXCEEDED_CODE = 'limits_exceeded'.freeze
-    private_constant :LIMITS_EXCEEDED_CODE
-
-    LIMITS_EXCEEDED_MSG = 'usage limits are exceeded'.freeze
-    private_constant :LIMITS_EXCEEDED_MSG
-
     # Exception raised when the 3scale client is called with the right params
     # but it returns a ServerError. Most of the time this means that 3scale is
     # down.
@@ -41,9 +33,10 @@ module Xcflushd
         threescale_client.authorize(service_id: service_id, user_key: user_key)
       end
 
-      if denied_but_not_because_limits?(auth)
-        return reported_metrics.map do |metric|
-          Authorization.new(metric, false, auth.error_code)
+      if !auth.success? && !auth.limits_exceeded?
+        return reported_metrics.inject({}) do |acc, metric|
+          acc[metric] = Authorization.denied!(auth.error_code)
+          acc
         end
       end
 
@@ -56,13 +49,6 @@ module Xcflushd
 
     def next_hit_auth?(usages)
       usages.all? { |usage| usage.current_value + 1 <= usage.max_value }
-    end
-
-    def denied_but_not_because_limits?(auth)
-      # Sometimes error_code is nil when usage limits are exceeded ¯\_(ツ)_/¯.
-      # That's why we check both error_code and error_message.
-      !auth.success? && !(auth.error_code == LIMITS_EXCEEDED_CODE ||
-          auth.error_message == LIMITS_EXCEEDED_MSG)
     end
 
     def usage_reports(auth, reported_metrics)
@@ -89,25 +75,25 @@ module Xcflushd
 
     def auths_according_to_limits(app_auth, reported_metrics)
       metrics_usage = usage_reports(app_auth, reported_metrics)
-      denied_metrics = {}
 
       # We need to sort the metrics. When the authorization of a metric is
       # denied, all its children should be denied too. If we check the parents
       # first, when they are denied, we know that we do not need to check the
       # limits for their children. This saves us some work.
-      sorted_metrics(metrics_usage.keys, app_auth.hierarchy).inject([]) do |acc, metric|
-        unless denied_metrics[metric]
-          auth = next_hit_auth?(metrics_usage[metric])
-          acc << Authorization.new(
-              metric, auth, auth ? nil : LIMITS_EXCEEDED_CODE)
-
-          if !auth && (children = app_auth.hierarchy[metric])
-            children.each do |child_metric|
-              acc << Authorization.new(
-                  child_metric, false, LIMITS_EXCEEDED_CODE)
-              denied_metrics[child_metric] = true
-            end
-          end
+      sorted_metrics(metrics_usage.keys, app_auth.hierarchy).inject({}) do |acc, metric|
+        unless acc[metric]
+          acc[metric] = if next_hit_auth?(metrics_usage[metric])
+                          Authorization.ok!
+                        else
+                          auth = Authorization.denied!(app_auth.error_code)
+                          children = app_auth.hierarchy[metric]
+                          if children
+                            children.each do |child_metric|
+                              acc[child_metric] = auth
+                            end
+                          end
+                          auth
+                        end
         end
 
         acc
