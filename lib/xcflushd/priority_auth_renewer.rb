@@ -223,13 +223,10 @@ module Xcflushd
       # threads could enter the if at the same time repeating work. That is
       # why we use concurrent-ruby's Map#put_if_absent, which is atomic.
 
-      # Using this method with randoms, there can be collisions. However, the
-      # code is way simpler that other solutions that we can think of. Also,
-      # when there is a collision (and they should not be that frequent), the
-      # only problem is that we will contact 3scale asking for the same thing
-      # several times in parallel.
-      r = random.rand(MAX_RANDOM)
-      current_auths.put_if_absent(channel_msg, r) != nil
+      # The value we set in the map is not relevant. #put_if_absent returns
+      # nil when the key is not in the map, which means that we are not
+      # currently authorizing it. That is all we care about.
+      current_auths.put_if_absent(channel_msg, true) != nil
     end
 
     def mark_auth_task_as_finished(channel_msg)
