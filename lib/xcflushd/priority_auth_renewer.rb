@@ -26,9 +26,6 @@ module Xcflushd
     AUTH_RESPONSES_CHANNEL_PREFIX = 'xc_channel_auth_response:'.freeze
     private_constant :AUTH_RESPONSES_CHANNEL_PREFIX
 
-    MAX_RANDOM = 1 << 31
-    private_constant :MAX_RANDOM
-
     # Number of times that a response is published
     TIMES_TO_PUBLISH = 5
     private_constant :TIMES_TO_PUBLISH
