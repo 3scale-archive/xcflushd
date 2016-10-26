@@ -41,7 +41,7 @@ module Xcflushd
     end
 
     let(:other_app_metrics_auths) do
-      { 'metric2' => Authorization.ok!, 'metric3' => Authorization.ok! }
+      { 'metric2' => Authorization.allow, 'metric3' => Authorization.allow }
     end
     let(:authorizations) { metric_auth.merge(other_app_metrics_auths) }
 
@@ -96,18 +96,18 @@ module Xcflushd
       end
 
       context 'and the metric received is authorized' do
-        let(:metric_auth) { { metric => Authorization.ok! } }
+        let(:metric_auth) { { metric => Authorization.allow } }
         include_examples 'authorization to be renewed', '1'
       end
 
       context 'and the metric received is not authorized' do
         context 'and the deny reason is specified' do
-          let(:metric_auth) { { metric => Authorization.denied!('a_reason') } }
+          let(:metric_auth) { { metric => Authorization.deny('a_reason') } }
           include_examples 'authorization to be renewed', '0:a_reason'
         end
 
         context 'and the deny reason is not specified' do
-          let(:metric_auth) { { metric => Authorization.denied! } }
+          let(:metric_auth) { { metric => Authorization.deny } }
           include_examples 'authorization to be renewed', '0'
         end
       end
@@ -156,7 +156,7 @@ module Xcflushd
     end
 
     context 'when there is an error publishing the response' do
-      let(:metric_auth) { { metric => Authorization.ok! } }
+      let(:metric_auth) { { metric => Authorization.allow } }
 
       before do
         allow(redis_pub).to receive(:publish).and_raise

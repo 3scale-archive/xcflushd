@@ -1,11 +1,11 @@
 module Xcflushd
-  Authorization = Struct.new(:authorized, :reason) do
+  Authorization = Struct.new(:allowed, :reason) do
     def initialize(authorized, reason = nil)
       super(authorized, authorized ? nil : reason)
     end
 
     def authorized?
-      authorized
+      allowed
     end
   end
 
@@ -14,8 +14,8 @@ module Xcflushd
     LIMITS_EXCEEDED_CODE = 'limits_exceeded'.freeze
     private_constant :LIMITS_EXCEEDED_CODE
 
-    AUTHORIZED = new(true).freeze
-    private_constant :AUTHORIZED
+    ALLOWED = new(true).freeze
+    private_constant :ALLOWED
     DENIED = new(false).freeze
     private_constant :DENIED
     LIMITS_EXCEEDED = new(false, LIMITS_EXCEEDED_CODE).freeze
@@ -27,11 +27,15 @@ module Xcflushd
       reason == LIMITS_EXCEEDED_CODE
     end
 
-    def self.ok!
-      AUTHORIZED
+    def self.allow
+      ALLOWED
     end
 
-    def self.denied!(reason = nil)
+    def self.deny_over_limits
+      LIMITS_EXCEEDED
+    end
+
+    def self.deny(reason = nil)
       if reason.nil?
         DENIED
       # this test has to be done in case the code changes

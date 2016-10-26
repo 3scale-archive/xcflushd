@@ -4,7 +4,7 @@ module Xcflushd
   describe Authorization do
     describe '#authorized?' do
       context 'when authorized' do
-        subject { Authorization.ok! }
+        subject { Authorization.allow }
 
         it 'returns true' do
           expect(subject.authorized?).to be true
@@ -12,7 +12,7 @@ module Xcflushd
       end
 
       context 'when not authorized' do
-        subject { Authorization.denied! }
+        subject { Authorization.deny }
 
         it 'returns false' do
           expect(subject.authorized?).to be false
@@ -22,7 +22,7 @@ module Xcflushd
 
     describe '#reason' do
       context 'when specified' do
-        subject { Authorization.denied!(reason) }
+        subject { Authorization.deny(reason) }
         let(:reason) { 'a_reason' }
 
         it 'returns the reason' do
@@ -31,7 +31,7 @@ module Xcflushd
       end
 
       context 'when unspecified' do
-        subject { Authorization.denied! }
+        subject { Authorization.deny }
 
         it 'returns nil' do
           expect(subject.reason).to be_nil
@@ -41,7 +41,7 @@ module Xcflushd
 
     describe '#limits_exceeded?' do
       context 'when reason is limits exceeded' do
-        subject { Authorization.denied!(Authorization.const_get(:LIMITS_EXCEEDED_CODE)) }
+        subject { Authorization.deny(Authorization.const_get(:LIMITS_EXCEEDED_CODE)) }
 
         it 'returns true' do
           expect(subject.limits_exceeded?).to be true
@@ -49,7 +49,7 @@ module Xcflushd
       end
 
       context 'when reason is not limits exceeded' do
-        subject { Authorization.denied!('some_reason') }
+        subject { Authorization.deny('some_reason') }
 
         it 'returns false' do
           expect(subject.limits_exceeded?).to be false
@@ -102,24 +102,24 @@ module Xcflushd
       end
     end
 
-    describe '.ok!' do
-      it_behaves_like 'an authorization', true, described_class, :ok!
-      it_behaves_like 'a constant object', described_class, :ok!
+    describe '.allow' do
+      it_behaves_like 'an authorization', true, described_class, :allow
+      it_behaves_like 'a constant object', described_class, :allow
     end
 
-    describe '.denied!' do
+    describe '.deny' do
       context 'when no reason is given' do
-        it_behaves_like 'an authorization', false, described_class, :denied!
-        it_behaves_like 'a constant object', described_class, :denied!
+        it_behaves_like 'an authorization', false, described_class, :deny
+        it_behaves_like 'a constant object', described_class, :deny
       end
 
       context 'when specified reason is the well-known limits_exceeded' do
-        it_behaves_like 'an authorization', false, described_class, :denied!, 'limits_exceeded'
-        it_behaves_like 'a constant object', described_class, :denied!, 'limits_exceeded'
+        it_behaves_like 'an authorization', false, described_class, :deny, 'limits_exceeded'
+        it_behaves_like 'a constant object', described_class, :deny, 'limits_exceeded'
       end
 
       context 'when specified reason is not well-known' do
-        it_behaves_like 'an authorization', false, described_class, :denied!, 'some_reason'
+        it_behaves_like 'an authorization', false, described_class, :deny, 'some_reason'
 
         # allocation behaviour is unspecified when the cause is not well-known
       end

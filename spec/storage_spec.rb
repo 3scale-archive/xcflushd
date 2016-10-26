@@ -328,13 +328,13 @@ module Xcflushd
       let(:authorized_metrics) { %w(am1 am2) }
       let(:non_authorized_metrics) { %w(nam1 nam2) }
       let(:denied_auths_with_a_reason) do
-        { 'nam3'=> Authorization.denied!('a_reason') }
+        { 'nam3'=> Authorization.deny('a_reason') }
       end
 
       let(:authorizations) do
         Hash[authorized_metrics.map { |metric|
-          [metric, Authorization.ok!] } + non_authorized_metrics.map { |metric|
-            [metric, Authorization.denied!] }
+          [metric, Authorization.allow] } + non_authorized_metrics.map { |metric|
+            [metric, Authorization.deny] }
         ].merge(denied_auths_with_a_reason)
       end
 

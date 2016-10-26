@@ -35,7 +35,7 @@ module Xcflushd
 
       if !auth.success? && !auth.limits_exceeded?
         return reported_metrics.inject({}) do |acc, metric|
-          acc[metric] = Authorization.denied!(auth.error_code)
+          acc[metric] = Authorization.deny(auth.error_code)
           acc
         end
       end
@@ -83,9 +83,9 @@ module Xcflushd
       sorted_metrics(metrics_usage.keys, app_auth.hierarchy).inject({}) do |acc, metric|
         unless acc[metric]
           acc[metric] = if next_hit_auth?(metrics_usage[metric])
-                          Authorization.ok!
+                          Authorization.allow
                         else
-                          auth = Authorization.denied!(app_auth.error_code)
+                          auth = Authorization.deny(app_auth.error_code)
                           children = app_auth.hierarchy[metric]
                           if children
                             children.each do |child_metric|
