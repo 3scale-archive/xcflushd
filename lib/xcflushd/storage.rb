@@ -88,8 +88,8 @@ module Xcflushd
       hash_key = auth_hash_key(service_id, user_key)
 
       authorizations.each_slice(REDIS_BATCH_KEYS) do |authorizations_slice|
-        authorizations_slice.each do |auth|
-          storage.hset(hash_key, auth.metric, auth_value(auth))
+        authorizations_slice.each do |metric, auth|
+          storage.hset(hash_key, metric, auth_value(auth))
         end
       end
 

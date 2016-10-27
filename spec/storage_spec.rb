@@ -328,13 +328,14 @@ module Xcflushd
       let(:authorized_metrics) { %w(am1 am2) }
       let(:non_authorized_metrics) { %w(nam1 nam2) }
       let(:denied_auths_with_a_reason) do
-        [Authorization.new('nam3', false, 'a_reason')]
+        { 'nam3'=> Authorization.deny('a_reason') }
       end
 
       let(:authorizations) do
-        authorized_metrics.map { |metric| Authorization.new(metric, true) } +
-          non_authorized_metrics.map { |metric| Authorization.new(metric, false) } +
-          denied_auths_with_a_reason
+        Hash[authorized_metrics.map { |metric|
+          [metric, Authorization.allow] } + non_authorized_metrics.map { |metric|
+            [metric, Authorization.deny] }
+        ].merge(denied_auths_with_a_reason)
       end
 
       context 'when there are no errors' do
@@ -354,8 +355,8 @@ module Xcflushd
 
         it 'renews the authorization of denied metrics specifying the reason' do
           subject.renew_auths(service_id, user_key, authorizations, valid_min)
-          denied_auths_with_a_reason.each do |auth|
-            expect(redis.hget(auth_hash_key, auth.metric)).to eq "0:#{auth.reason}"
+          denied_auths_with_a_reason.each do |metric, auth|
+            expect(redis.hget(auth_hash_key, metric)).to eq "0:#{auth.reason}"
           end
         end
 
