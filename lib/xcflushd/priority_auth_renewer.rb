@@ -1,23 +1,23 @@
 module Xcflushd
-
   # Apart from flushing all the cached reports and renewing the authorizations
   # periodically, we need to provide a mechanism to renew a specific auth at
-  # any time.
+  # any time. The information needed is the combination of service, application
+  # and metric.
   #
-  # When the client looks for the auth of a metric in the cache, it might not
-  # be there. It could be an authorization that has never been cached or one
+  # When the client looks for the auth of a combination in the cache, it might
+  # not be there. It could be an authorization that has never been cached or one
   # that has expired. In that case, we need to provide a way to check a
   # specific authorization without waiting for the next flush cycle.
   #
   # We use Redis publish/subscribe to solve this problem. We use 2 different
   # type of channels:
   #   1) Auth requests channel. It's the channel where the client specifies the
-  #      metrics that need to be checked. xcflushd is subscribed to the
+  #      combinations that need to be checked. xcflushd is subscribed to the
   #      channel. There is only one channel of this type.
-  #   2) Responses channel. Every time there's a request for a specific metric,
-  #      a channel of this type is created. The client is subscribed to this
-  #      channel, and xcflushd will publish the authorization status once it
-  #      gets it from 3scale.
+  #   2) Responses channel. Every time there's a request for a specific
+  #      combination, a channel of this type is created. The client is
+  #      subscribed to this channel, and xcflushd will publish the authorization
+  #      status once it gets it from 3scale.
   class PriorityAuthRenewer
 
     AUTH_REQUESTS_CHANNEL = 'xc_channel_auth_requests'.freeze
@@ -44,12 +44,13 @@ module Xcflushd
       @auth_valid_min = auth_valid_min
       @logger = logger
 
-      # We can receive several requests to renew the authorization of a metric
-      # while we are already renewing it. We want to avoid performing several
-      # calls to 3scale asking for the same thing. For that reason, we use a
-      # map to keep track of the metrics that we are renewing.
-      # This map is updated from different threads. We use Concurrent::Map
-      # to ensure thread-safety.
+      # We can receive several requests to renew the authorization of a
+      # combination while we are already renewing it. We want to avoid
+      # performing several calls to 3scale asking for the same thing. For that
+      # reason, we use a map to keep track of the combinations that we are
+      # renewing.
+      # This map is updated from different threads. We use Concurrent::Map to
+      # ensure thread-safety.
       @current_auths = Concurrent::Map.new
 
       @random = Random.new
@@ -100,12 +101,12 @@ module Xcflushd
       end
     end
 
-    # Apart from renewing the auth of the metric received, we also renew all
-    # the metrics of the app it belongs to. The reason is that to renew only 1
-    # metric we need to perform 1 call to 3scale, and to renew all the limited
-    # metrics of an application we also need 1. If the metric received does not
-    # have limits defined, we need to perform 2 calls, but still, it is worth
-    # to renew all of them for that price.
+    # Apart from renewing the auth of the combination received, we also renew
+    # all the metrics of the associated application. The reason is that to renew
+    # a single metric we need to perform one call to 3scale, and to renew all
+    # the limited metrics of an application we also need one. If the metric
+    # received does not have limits defined, we need to perform two calls, but
+    # still it is worth to renew all of them for that price.
     #
     # Note: Some exceptions can be raised inside the futures that are executed
     # by the thread pool. For example, when 3scale is not accessible, when
@@ -119,10 +120,10 @@ module Xcflushd
       Concurrent::Future.new(executor: thread_pool) do
         success = true
         begin
-          metric = auth_channel_msg_2_metric(channel_msg)
-          app_auths = app_authorizations(metric)
-          renew(metric[:service_id], metric[:user_key], app_auths)
-          metric_auth = app_auths[metric[:metric]]
+          combination = auth_channel_msg_2_combination(channel_msg)
+          app_auths = app_authorizations(combination)
+          renew(combination[:service_id], combination[:user_key], app_auths)
+          metric_auth = app_auths[combination[:metric]]
         rescue StandardError
           # If we do not do rescue, we would not be able to process the same
           # message again.
@@ -137,42 +138,42 @@ module Xcflushd
         # in the auths that failed. Also, as we do not publish anything when
         # there is an error, the subscriber waits until it timeouts.
         # This is good enough for now, but there is room for improvement.
-        publish_auth_repeatedly(metric, metric_auth) if success
+        publish_auth_repeatedly(combination, metric_auth) if success
       end
     end
 
     # A message in the auth channel requests has this format:
     # "#{service_id}:#{user_key}:#{metric}"
-    def auth_channel_msg_2_metric(msg)
+    def auth_channel_msg_2_combination(msg)
       service_id, user_key, metric = msg.split(':'.freeze)
       { service_id: service_id, user_key: user_key, metric: metric }
     end
 
-    def app_authorizations(metric)
-      authorizer.authorizations(metric[:service_id],
-                                metric[:user_key],
-                                [metric[:metric]])
+    def app_authorizations(combination)
+      authorizer.authorizations(combination[:service_id],
+                                combination[:user_key],
+                                [combination[:metric]])
     end
 
     def renew(service_id, user_key, auths)
       storage.renew_auths(service_id, user_key, auths, auth_valid_min)
     end
 
-    def channel_for_metric(metric)
-      "#{AUTH_RESPONSES_CHANNEL_PREFIX}#{metric[:service_id]}:"\
-        "#{metric[:user_key]}:#{metric[:metric]}"
+    def channel_for_combination(combination)
+      "#{AUTH_RESPONSES_CHANNEL_PREFIX}#{combination[:service_id]}:"\
+        "#{combination[:user_key]}:#{combination[:metric]}"
     end
 
-    def publish_auth_repeatedly(metric, authorization)
+    def publish_auth_repeatedly(combination, authorization)
       # There is a race condition here. A renew and publish task is only run
-      # when there is not another one renewing the same metric. When there is
-      # another, the incoming request does not trigger a new task, but waits
+      # when there is not another one renewing the same combination. When there
+      # is another, the incoming request does not trigger a new task, but waits
       # for the publish below. The request could miss the published message
       # if events happened in this order:
-      #   1) The request publishes the metric it needs in the requests
+      #   1) The request publishes the combination it needs in the requests
       #      channel.
       #   2) A new task is not executed, because there is another renewing
-      #      the same metric.
+      #      the same combination.
       #   3) That task publishes the result.
       #   4) The request subscribes to receive the result, but now it is
       #      too late.
@@ -185,7 +186,7 @@ module Xcflushd
       publish_failures = 0
       TIMES_TO_PUBLISH.times do |t|
         begin
-          publish_auth(metric, authorization)
+          publish_auth(combination, authorization)
         rescue
           publish_failures += 1
         end
@@ -194,18 +195,18 @@ module Xcflushd
 
       if publish_failures > 0
         logger.warn('There was an error while publishing a response in the '\
-                    "priority channel. Metric: #{metric}".freeze)
+                    "priority channel. Combination: #{combination}".freeze)
       end
     end
 
-    def publish_auth(metric, authorization)
+    def publish_auth(combination, authorization)
       msg = if authorization.authorized?
               '1'.freeze
             else
                authorization.reason ? "0:#{authorization.reason}" : '0'.freeze
             end
 
-      redis_pub.publish(channel_for_metric(metric), msg)
+      redis_pub.publish(channel_for_combination(combination), msg)
     end
 
     def currently_authorizing?(channel_msg)
