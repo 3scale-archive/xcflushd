@@ -49,7 +49,6 @@ module Xcflushd
       transaction = application_usage.reject { |k, _v| k == :service_id }
 
       begin
-        # TODO: The 3scale API imposes a limit of 1000 metrics per report call
         resp = threescale_client.report(transactions: [transaction],
                                         service_id: service_id)
       # TODO: get rid of the coupling with ThreeScale::ServerError
