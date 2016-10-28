@@ -85,7 +85,7 @@ module Xcflushd
           acc[metric] = if next_hit_auth?(metrics_usage[metric])
                           Authorization.allow
                         else
-                          auth = Authorization.deny(app_auth.error_code)
+                          auth = Authorization.deny_over_limits
                           children = app_auth.hierarchy[metric]
                           if children
                             children.each do |child_metric|
