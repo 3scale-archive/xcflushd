@@ -1,36 +1,99 @@
 # Xcflushd
 
-Welcome to your new gem! In this directory, you'll find the files you need to be able to package up your Ruby library into a gem. Put your Ruby code in the file `lib/xcflushd`. To experiment with that code, run `bin/console` for an interactive prompt.
+## Description
 
-TODO: Delete this and the text above, and describe your gem
+This is a daemon used by [XC](https://github.com/3scale/xc.lua). XC is a module
+for [Apicast](https://github.com/3scale/apicast), 3scale's API gateway.
 
-## Installation
+Apicast performs one call to 3scale's backend for each request that it
+receives. The goal of XC is to reduce latency and increase throughput by
+significantly reducing the number of requests made to 3scale's backend. In
+order to achieve that, XC caches authorization statuses and reports.
 
-Add this line to your application's Gemfile:
+Xcflushd is a daemon that is required to run while using XC. Its responsibility
+consists of flushing the cached reports and renewing the cached authorization
+statuses. All this is done in background, not in request time.
 
-```ruby
-gem 'xcflushd'
+Xcflushd can run together with a different gateway as long as it uses the same
+format for the cached authorizations and reports. This format will be
+documented soon.
+
+## Development environment and testing
+
+You will need [Docker](https://www.docker.com/) and GNU make.
+
+First, clone the project:
+```
+$ git clone git@github.com:3scale/xcflushd.git
 ```
 
-And then execute:
+Next, cd into the directory, `cd xcflushd`
 
-    $ bundle
+Run the tests with:
+```
+$ make test
+```
 
-Or install it yourself as:
+That will run the unit test suite. It's using [Rspec](https://rspec.info).
 
-    $ gem install xcflushd
+Develop with:
+```
+$ make bash
+```
 
-## Usage
+That will create a Docker container and run bash inside it. The project's
+source code will be available in `~/app` and synced with your local xcflushd
+directory. You can edit files in your preferred environment and still be able
+to run whatever you need inside the Docker container.
 
-TODO: Write usage instructions here
 
-## Development
+## Deployment
 
-After checking out the repo, run `bin/setup` to install dependencies. Then, run `rake spec` to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
+### Docker
 
-To install this gem onto your local machine, run `bundle exec rake install`. To release a new version, update the version number in `version.rb`, and then run `bundle exec rake release`, which will create a git tag for the version, push git commits and tags, and push the `.gem` file to [rubygems.org](https://rubygems.org).
+We will provide a Dockerfile soon.
+
+### Locally
+
+You will need a Redis server running.
+
+Install the dependencies:
+```
+$ bundle install
+```
+
+Run the program:
+```
+$ bundle exec exe/xcflushd -h
+```
+
+### Openshift
+
+If what you need is deploying Xcflushd together with Apicast and XC, you can
+follow the instructions provided in the [xc.lua repo](https://github.com/3scale/xc.lua).
+
+
+## How it works
+
+Every X minutes (configurable) the flusher does two things:
+
+1. Reports to 3scale all the reports cached in Redis.
+2. Renews the authorization status (authorized/denied) for all the
+   applications affected by the cached reports that have been reported to
+   3scale.
+
+A detailed design document will be provided later.
+
 
 ## Contributing
 
-Bug reports and pull requests are welcome on GitHub at https://github.com/[USERNAME]/xcflushd.
+1. Fork the project
+2. Create your feature branch: `git checkout -b my-new-feature`
+3. Commit your changes: `git commit -am 'Add some feature'`
+4. Push to the branch: `git push origin my-new-feature`
+5. Create a new Pull Request
 
+
+## License
+
+[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)
