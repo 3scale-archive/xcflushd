@@ -2,11 +2,12 @@
 
 ## Description
 
-This is a daemon used by [XC](https://github.com/3scale/xc.lua). XC is a module
-for [Apicast](https://github.com/3scale/apicast), 3scale's API gateway.
+This is the daemon that flushes the data that the gateway side of XC like the
+[xc.lua](https://github.com/3scale/xc.lua) module running on top of [Apicast](https://github.com/3scale/apicast), stores for reporting and authorizing to 3scale.
 
-Apicast performs one call to 3scale's backend for each request that it
-receives. The goal of XC is to reduce latency and increase throughput by
+When you deploy 3scale to a gateway you usually have a request performed to
+3scale for every request that needs authorization, which introduces latency and
+load in 3scale. The goal of XC is to reduce latency and increase throughput by
 significantly reducing the number of requests made to 3scale's backend. In
 order to achieve that, XC caches authorization statuses and reports.
 
