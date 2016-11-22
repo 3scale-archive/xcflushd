@@ -5,6 +5,17 @@ require 'xcflushd/runner'
 
 include GLI::App
 
+OPTIONS = [:'threescale-host',
+           :'threescale-port',
+           :'provider-key',
+           :'redis-host',
+           :'redis-port',
+           :'auth-valid-minutes',
+           :'reporting-freq-minutes',
+           :'daemonize'].freeze
+
+REQUIRED_OPTIONS = (OPTIONS - [:'daemonize']).freeze
+
 def start_xcflusher(options)
   int_opt_fields = [:'threescale-port', :'redis-port',
                     :'auth-valid-minutes', :'reporting-freq-minutes']
@@ -47,12 +58,7 @@ command :run do |c|
   c.switch :daemonize
 
   c.action do |_global_options, options, _args|
-    [:'threescale-host',
-     :'provider-key',
-     :'redis-host',
-     :'redis-port',
-     :'auth-valid-minutes',
-     :'reporting-freq-minutes'].each do |opt|
+    REQUIRED_OPTIONS.each do |opt|
       help_now!("#{opt} is required") unless options[opt]
     end
 
