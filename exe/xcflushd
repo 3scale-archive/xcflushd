@@ -58,6 +58,14 @@ command :run do |c|
   c.switch :daemonize
 
   c.action do |_global_options, options, _args|
+    # options contains 2 keys for each option. One is a String and the other a
+    # Symbol. That way we can use options['redis-host'] and
+    # options[:'redis-host']. That's fine as long as we only read from the
+    # hash. If we need to modify it, it is problematic because we need to
+    # remember to modify two values. For simplicity, let's just keep the
+    # elements that have symbols as keys.
+    options.keep_if { |k, _v| k.is_a?(Symbol) }
+
     REQUIRED_OPTIONS.each do |opt|
       help_now!("#{opt} is required") unless options[opt]
     end
