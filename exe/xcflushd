@@ -54,7 +54,7 @@ command :run do |c|
   c.flag :'threescale-host'
 
   c.desc '3scale backend port'
-  c.flag :'threescale-port', default_value: 80
+  c.flag :'threescale-port'
 
   c.desc '3scale provider key'
   c.flag :'provider-key'
