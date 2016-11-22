@@ -96,4 +96,4 @@ RUN chown -R ${USER_NAME}: ${APP_HOME}
 USER ${USER_NAME}
 RUN bundle install
 
-CMD ["script/test"]
+CMD bundle exec exe/xcflushd run
