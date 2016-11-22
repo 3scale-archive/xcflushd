@@ -23,6 +23,17 @@ def start_xcflusher(options)
   Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
 end
 
+# Saves in the options hash those config options present in ENV that have not
+# been specified as command arguments.
+def read_missing_opts_from_env(options)
+  OPTIONS.each do |opt|
+    if options[opt].nil?
+      # ENV vars have "_" instead of "-" and are written in uppercase.
+      options[opt] = ENV[opt.to_s.gsub('-'.freeze, '_'.freeze).upcase]
+    end
+  end
+end
+
 program_desc 'XC flush daemon'
 
 version Xcflushd::VERSION
@@ -65,6 +76,8 @@ command :run do |c|
     # remember to modify two values. For simplicity, let's just keep the
     # elements that have symbols as keys.
     options.keep_if { |k, _v| k.is_a?(Symbol) }
+
+    read_missing_opts_from_env(options)
 
     REQUIRED_OPTIONS.each do |opt|
       help_now!("#{opt} is required") unless options[opt]
