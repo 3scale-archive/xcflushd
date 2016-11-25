@@ -50,8 +50,6 @@ module Xcflushd
       # ensure thread-safety.
       @current_auths = Concurrent::Map.new
 
-      @random = Random.new
-
       # TODO: Tune the options of the thread pool
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
           max_threads: Concurrent.processor_count * 4)
@@ -71,7 +69,7 @@ module Xcflushd
     private
 
     attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_valid_min,
-                :logger, :current_auths, :random, :thread_pool
+                :logger, :current_auths, :thread_pool
 
     def subscribe_to_requests_channel
       redis_sub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
