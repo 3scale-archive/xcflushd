@@ -12,26 +12,6 @@ module Xcflushd
   # journal (in Redis or disk).
   class Storage
 
-    # Set that contains the keys of the cached reports
-    SET_KEYS_CACHED_REPORTS = 'report_keys'.freeze
-    private_constant :SET_KEYS_CACHED_REPORTS
-
-    # Set that contains the keys of the cached reports to be flushed
-    SET_KEYS_FLUSHING_REPORTS = 'flushing_report_keys'.freeze
-    private_constant :SET_KEYS_FLUSHING_REPORTS
-
-    # Prefix to identify cached authorizations
-    AUTH_KEY_PREFIX = 'auth:'.freeze
-    private_constant :AUTH_KEY_PREFIX
-
-    # Prefix to identify cached reports
-    REPORT_KEY_PREFIX = 'report:'.freeze
-    private_constant :REPORT_KEY_PREFIX
-
-    # Prefix to identify cached reports that are ready to be flushed
-    KEY_TO_FLUSH_PREFIX = 'to_flush:'.freeze
-    private_constant :KEY_TO_FLUSH_PREFIX
-
     # Some Redis operations might block the server for a long time if they need
     # to operate on big collections of keys or values.
     # For that reason, when using pipelines, instead of sending all the keys in
@@ -51,24 +31,25 @@ module Xcflushd
     private_constant :CLEANUP_ERROR
 
     class RenewAuthError < Flusher::XcflushdError
-      def initialize(service_id, user_key)
+      def initialize(service_id, credentials)
         super("Error while renewing the auth for service ID: #{service_id} "\
-              "and user key: #{user_key}")
+              "and credentials: #{credentials}")
       end
     end
 
-    def initialize(storage, logger)
+    def initialize(storage, logger, storage_keys)
       @storage = storage
       @logger = logger
+      @storage_keys = storage_keys
     end
 
     # This performs a cleanup of the reports to be flushed.
     # We can decide later whether it is better to leave this responsibility
     # to the caller of the method.
     #
-    # Returns an array of hashes where each of them has a service_id, an
-    # user_key, and a usage. The usage is another hash where the keys are the
-    # metrics and the values are guaranteed to respond to to_i and to_s.
+    # Returns an array of hashes where each of them has a service_id,
+    # credentials, and a usage. The usage is another hash where the keys are
+    # the metrics and the values are guaranteed to respond to to_i and to_s.
     def reports_to_flush
       # The Redis rename command overwrites the key with the new name if it
       # exists. This means that if the rename operation fails in a flush cycle,
@@ -84,8 +65,8 @@ module Xcflushd
       reports(report_keys, suffix)
     end
 
-    def renew_auths(service_id, user_key, authorizations, valid_minutes)
-      hash_key = auth_hash_key(service_id, user_key)
+    def renew_auths(service_id, credentials, authorizations, valid_minutes)
+      hash_key = hash_key(:auth, service_id, credentials)
 
       authorizations.each_slice(REDIS_BATCH_KEYS) do |authorizations_slice|
         authorizations_slice.each do |metric, auth|
@@ -93,10 +74,10 @@ module Xcflushd
         end
       end
 
-      set_auth_validity(service_id, user_key, valid_minutes)
+      set_auth_validity(service_id, credentials, valid_minutes)
 
     rescue Redis::BaseError
-      raise RenewAuthError.new(service_id, user_key)
+      raise RenewAuthError.new(service_id, credentials)
     end
 
     def report(reports)
@@ -108,12 +89,12 @@ module Xcflushd
 
     private
 
-    attr_reader :storage, :logger
+    attr_reader :storage, :logger, :storage_keys
 
     def report_keys_to_flush(suffix)
       begin
-        return [] if storage.scard(SET_KEYS_CACHED_REPORTS) == 0
-        storage.rename(SET_KEYS_CACHED_REPORTS,
+        return [] if storage.scard(set_keys_cached_reports) == 0
+        storage.rename(set_keys_cached_reports,
                        set_keys_flushing_reports(suffix))
       rescue Redis::BaseError
         # We could not even start the process of getting the reports, so just
@@ -125,7 +106,7 @@ module Xcflushd
       flushing_reports = flushing_report_keys(suffix)
 
       keys_with_flushing_prefix = flushing_reports.map do |key|
-        name_key_to_flush(key, suffix)
+        storage_keys.name_key_to_flush(key, suffix)
       end
 
       # Hash with old names as keys and new ones as values
@@ -147,17 +128,7 @@ module Xcflushd
       res
     end
 
-    def name_key_to_flush(report_key, suffix)
-      "#{KEY_TO_FLUSH_PREFIX}#{report_key}#{suffix}"
-    end
-
-    def service_and_user_key(key_to_flush, suffix)
-      key_to_flush.sub("#{KEY_TO_FLUSH_PREFIX}#{REPORT_KEY_PREFIX}", '')
-                  .sub(suffix, '')
-                  .split(':')
-    end
-
-    # Returns a report (hash with service_id, user_key, and usage) for each of
+    # Returns a report (hash with service_id, credentials, and usage) for each of
     # the keys received.
     def reports(keys_to_flush, suffix)
       result = []
@@ -176,9 +147,9 @@ module Xcflushd
             # The usage could be empty if we failed to rename the key in the
             # previous step. hgetall returns {} for keys that do not exist.
             unless usages[i].empty?
-              service_id, user_key = service_and_user_key(key, suffix)
+              service_id, creds = storage_keys.service_and_creds(key, suffix)
               result << { service_id: service_id,
-                          user_key: user_key,
+                          credentials: creds,
                           usage: usages[i] }
             end
           end
@@ -234,24 +205,17 @@ module Xcflushd
       end
     end
 
-    def auth_hash_key(service_id, user_key)
-      "#{AUTH_KEY_PREFIX}#{service_id}:#{user_key}"
-    end
-
-    def report_hash_key(service_id, user_key)
-      "#{REPORT_KEY_PREFIX}#{service_id}:#{user_key}"
-    end
-
-    def set_auth_validity(service_id, user_key, valid_minutes)
+    def set_auth_validity(service_id, credentials, valid_minutes)
       # Redis does not allow us to set a TTL for hash key fields. TTLs can only
       # be applied to the key containing the hash. This is not a problem
       # because we always renew all the metrics of an application at the same
       # time.
-      storage.expire(auth_hash_key(service_id, user_key), valid_minutes * 60)
+      storage.expire(hash_key(:auth, service_id, credentials),
+                     valid_minutes * 60)
     end
 
     def increase_usage(report)
-      hash_key = report_hash_key(report[:service_id], report[:user_key])
+      hash_key = hash_key(:report, report[:service_id], report[:credentials])
 
       report[:usage].each_slice(REDIS_BATCH_KEYS) do |usages|
         usages.each do |usage|
@@ -262,8 +226,8 @@ module Xcflushd
     end
 
     def add_to_set_keys_cached_reports(report)
-      hash_key = report_hash_key(report[:service_id], report[:user_key])
-      storage.sadd(SET_KEYS_CACHED_REPORTS, hash_key)
+      hash_key = hash_key(:report, report[:service_id], report[:credentials])
+      storage.sadd(set_keys_cached_reports, hash_key)
     end
 
     def auth_value(auth)
@@ -279,8 +243,17 @@ module Xcflushd
     end
 
     def set_keys_flushing_reports(suffix)
-      "#{SET_KEYS_FLUSHING_REPORTS}#{suffix}"
+      "#{storage_keys::SET_KEYS_FLUSHING_REPORTS}#{suffix}"
     end
+
+    def hash_key(type, service_id, credentials)
+      storage_keys.send("#{type}_hash_key", service_id, credentials)
+    end
+
+    def set_keys_cached_reports
+      storage_keys::SET_KEYS_CACHED_REPORTS
+    end
+
   end
 
 end
