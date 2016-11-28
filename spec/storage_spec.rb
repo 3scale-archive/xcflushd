@@ -5,7 +5,8 @@ module Xcflushd
   describe Storage do
     let(:redis) { Redis.new }
     let(:logger) { double('logger', warn: true, error: true) }
-    subject { described_class.new(redis, logger) }
+    let(:storage_keys) { StorageKeys }
+    subject { described_class.new(redis, logger, storage_keys) }
 
     let(:suffix) { '_20160101000000' }
 
@@ -23,12 +24,10 @@ module Xcflushd
       allow(subject).to receive(:suffix_for_unique_naming).and_return(suffix)
     end
 
-    let(:set_keys_cached_reports) do
-      described_class.const_get(:SET_KEYS_CACHED_REPORTS)
-    end
+    let(:set_keys_cached_reports) { storage_keys::SET_KEYS_CACHED_REPORTS }
 
     let(:set_keys_flushing_reports) do
-      described_class.const_get(:SET_KEYS_FLUSHING_REPORTS) + suffix
+      storage_keys::SET_KEYS_FLUSHING_REPORTS + suffix
     end
 
     let(:errors) do
@@ -43,22 +42,22 @@ module Xcflushd
         # Usage values could be ints, but Redis would return strings anyway.
         let(:cached_reports) do
           [{ service_id: 's1',
-             user_key: 'a1',
+             credentials: Credentials.new(user_key: 'uk1'),
              usage: { 'm1' => '1', 'm2' => '2' } },
            { service_id: 's2',
-             user_key: 'a2',
+             credentials: Credentials.new(user_key: 'uk2'),
              usage: { 'm1' => '10', 'm2' => '20' } }]
         end
 
         let(:cached_report_keys) do
           cached_reports.map do |cached_report|
-            report_key(cached_report[:service_id], cached_report[:user_key])
+            report_key(cached_report[:service_id], cached_report[:credentials])
           end
         end
 
         let(:reports_to_be_flushed_keys) do
           cached_report_keys.map do |key|
-            subject.send(:name_key_to_flush , key, suffix)
+            storage_keys.name_key_to_flush(key, suffix)
           end
         end
 
@@ -71,7 +70,7 @@ module Xcflushd
           # Store the cached reports as hashes where each metric is a field
           cached_reports.each do |cached_report|
             key = report_key(cached_report[:service_id],
-                             cached_report[:user_key])
+                             cached_report[:credentials])
             cached_report[:usage].each do |metric, value|
               redis.hset(key, metric, value)
             end
@@ -125,19 +124,23 @@ module Xcflushd
       # They are heavily dependent on the Redis commands used.
       context 'when there is an error' do
         let(:cached_reports) do
-          [{ service_id: 's1', user_key: 'a1', usage: { 'm1' => '1' } },
-           { service_id: 's2', user_key: 'a2', usage: { 'm1' => '10' } }]
+          [{ service_id: 's1',
+             credentials: Credentials.new(user_key: 'uk1'),
+             usage: { 'm1' => '1' } },
+           { service_id: 's2',
+             credentials: Credentials.new(user_key: 'uk2'),
+             usage: { 'm1' => '10' } }]
         end
 
         let(:cached_report_keys) do
           cached_reports.map do |cached_report|
-            report_key(cached_report[:service_id], cached_report[:user_key])
+            report_key(cached_report[:service_id], cached_report[:credentials])
           end
         end
 
         let(:reports_to_be_flushed_keys) do
           cached_report_keys.map do |key|
-            subject.send(:name_key_to_flush , key, suffix)
+            storage_keys.name_key_to_flush(key, suffix)
           end
         end
 
@@ -150,7 +153,7 @@ module Xcflushd
           # Store the cached reports as hashes where each metric is a field
           cached_reports.each do |cached_report|
             key = report_key(cached_report[:service_id],
-                             cached_report[:user_key])
+                             cached_report[:credentials])
             cached_report[:usage].each do |metric, value|
               redis.hset(key, metric, value)
             end
@@ -319,11 +322,8 @@ module Xcflushd
 
     describe '#renew_authorizations' do
       let(:service_id) { 'a_service_id' }
-      let(:user_key) { 'a_user_key' }
-      let(:auth_hash_key) do
-        subject.send(:auth_hash_key, service_id, user_key)
-      end
-
+      let(:credentials) { Credentials.new(user_key: 'a_user_key') }
+      let(:auth_hash_key) { auth_key(service_id, credentials) }
       let(:valid_min) { 5 }
       let(:authorized_metrics) { %w(am1 am2) }
       let(:non_authorized_metrics) { %w(nam1 nam2) }
@@ -340,28 +340,28 @@ module Xcflushd
 
       context 'when there are no errors' do
         it 'renews the authorization of the authorized metrics' do
-          subject.renew_auths(service_id, user_key, authorizations, valid_min)
+          subject.renew_auths(service_id, credentials, authorizations, valid_min)
           authorized_metrics.each do |metric|
             expect(redis.hget(auth_hash_key, metric)).to eq '1'
           end
         end
 
         it 'renews the authorization of the non-authorized metrics' do
-          subject.renew_auths(service_id, user_key, authorizations, valid_min)
+          subject.renew_auths(service_id, credentials, authorizations, valid_min)
           non_authorized_metrics.each do |metric|
             expect(redis.hget(auth_hash_key, metric)).to eq '0'
           end
         end
 
         it 'renews the authorization of denied metrics specifying the reason' do
-          subject.renew_auths(service_id, user_key, authorizations, valid_min)
+          subject.renew_auths(service_id, credentials, authorizations, valid_min)
           denied_auths_with_a_reason.each do |metric, auth|
             expect(redis.hget(auth_hash_key, metric)).to eq "0:#{auth.reason}"
           end
         end
 
         it 'sets a TTL for the hash that contains the auths of the application' do
-          subject.renew_auths(service_id, user_key, authorizations, valid_min)
+          subject.renew_auths(service_id, credentials, authorizations, valid_min)
           expect(redis.ttl(auth_hash_key)).to be_between(0, valid_min*60)
         end
       end
@@ -371,7 +371,7 @@ module Xcflushd
         before { allow(redis).to receive(:hset).and_raise(Redis::BaseError) }
 
         it "raises a #{renew_auth_error}" do
-          expect { subject.renew_auths(service_id, user_key, authorizations, valid_min) }
+          expect { subject.renew_auths(service_id, credentials, authorizations, valid_min) }
               .to raise_error(renew_auth_error)
         end
       end
@@ -379,8 +379,8 @@ module Xcflushd
 
     describe '#report' do
       let(:apps) do
-        { app1: { service_id: 's1', user_key: 'uk1'},
-          app2: { service_id: 's2', user_key: 'uk2'} }
+        { app1: { service_id: 's1', credentials: Credentials.new(user_key: 'uk1') },
+          app2: { service_id: 's2', credentials: Credentials.new(user_key: 'uk2') } }
       end
 
       let(:reported_usages) do
@@ -399,14 +399,14 @@ module Xcflushd
 
       let(:report_keys) do
         reports.map do |report|
-          report_key(report[:service_id], report[:user_key])
+          report_key(report[:service_id], report[:credentials])
         end
       end
 
       before do
         # Set the current usage
         apps.each do |app, id|
-          key = report_key(id[:service_id], id[:user_key])
+          key = report_key(id[:service_id], id[:credentials])
           current_usages[app].each do |metric, usage|
             redis.hset(key, metric, usage)
           end
@@ -416,7 +416,7 @@ module Xcflushd
       it 'increases the usage of all the metrics reported' do
         subject.report(reports)
         apps.each do |app, id|
-          key = report_key(id[:service_id], id[:user_key])
+          key = report_key(id[:service_id], id[:credentials])
           reported_usages[app].each do |metric, usage|
             expect(redis.hget(key, metric))
                 .to eq((usage.to_i + current_usages[app][metric].to_i).to_s)
@@ -431,8 +431,12 @@ module Xcflushd
       end
     end
 
-    def report_key(service_id, user_key)
-      subject.send(:report_hash_key, service_id, user_key)
+    def report_key(service_id, credentials)
+      storage_keys.report_hash_key(service_id, credentials)
+    end
+
+    def auth_key(service_id, credentials)
+      storage_keys.auth_hash_key(service_id, credentials)
     end
 
   end
