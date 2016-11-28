@@ -13,7 +13,7 @@ module Xcflushd
 
     describe '#authorizations' do
       let(:service_id) { 'a_service_id' }
-      let(:user_key) { 'a_user_key' }
+      let(:credentials) { Credentials.new(user_key: 'a_user_key') }
       let(:metric) { 'a_metric' }
       let(:reported_metrics) { [metric] }
       let(:metrics_hierarchy) { {} } # Default. Only 1 metric without children.
@@ -43,34 +43,34 @@ module Xcflushd
       before do
         allow(threescale_client)
             .to receive(:authorize)
-            .with({ service_id: service_id, user_key: user_key })
+            .with({ service_id: service_id }.merge(credentials.creds))
             .and_return(authorize_response)
       end
 
       # These shared_examples only apply when there only 1 metric is reported
       shared_examples 'denied auth' do |reason|
         it 'returns a denied authorization that includes the reason' do
-          auth = subject.authorizations(service_id, user_key, reported_metrics)
+          auth = subject.authorizations(service_id, credentials, reported_metrics)
           expect(auth[metric]).to eq Authorization.deny(reason)
         end
       end
 
       shared_examples 'app with authorized metric' do
         it 'returns an accepted authorization' do
-          auth = subject.authorizations(service_id, user_key, reported_metrics)
+          auth = subject.authorizations(service_id, credentials, reported_metrics)
           expect(auth[metric]).to eq Authorization.allow
         end
       end
 
       shared_examples 'app with hierarchies defined' do |reported_metrics, expected_auths|
         it 'returns the correct authorization status for each metric' do
-          auths = subject.authorizations(service_id, user_key, reported_metrics)
+          auths = subject.authorizations(service_id, credentials, reported_metrics)
           expect(auths).to eq expected_auths
         end
       end
 
       it 'returns one auth per reported metric' do
-        auths = subject.authorizations(service_id, user_key, reported_metrics)
+        auths = subject.authorizations(service_id, credentials, reported_metrics)
 
         expect(auths.size).to eq reported_metrics.size
       end
@@ -132,7 +132,7 @@ module Xcflushd
         let(:authorize_response) { denied_auth_response_limits_exceeded }
 
         it 'returns the correct authorization status for all of them' do
-          auths = subject.authorizations(service_id, user_key, reported_metrics)
+          auths = subject.authorizations(service_id, credentials, reported_metrics)
           expected_auths = authorized_metrics.map do |metric|
             [metric, Authorization.allow]
           end + unauthorized_metrics.map do |metric|
@@ -149,9 +149,7 @@ module Xcflushd
         before do
           allow(threescale_client)
               .to receive(:authorize)
-              .with({ service_id: service_id,
-                      user_key: user_key,
-                      usage: { metric => 1 } })
+              .with({ service_id: service_id }.merge(credentials.creds))
               .and_return(authorize_response)
         end
 
@@ -185,12 +183,12 @@ module Xcflushd
         before do
           allow(threescale_client)
               .to receive(:authorize)
-              .with({ service_id: service_id, user_key: user_key })
+              .with({ service_id: service_id }.merge(credentials.creds))
               .and_return(auth_response)
         end
 
         it 'returns a denied auth for each of the reported metrics' do
-          auths = subject.authorizations(service_id, user_key, reported_metrics)
+          auths = subject.authorizations(service_id, credentials, reported_metrics)
           denied_auth = Authorization.deny(reason)
 
           expect(auths).to contain_exactly(*reported_metrics.map { |m| [m,denied_auth] })
@@ -201,12 +199,12 @@ module Xcflushd
         before do
           allow(threescale_client)
               .to receive(:authorize)
-              .with({ service_id: service_id, user_key: user_key })
+              .with({ service_id: service_id }.merge(credentials.creds))
               .and_raise(ThreeScale::ServerError.new('error_msg'))
         end
 
         it "raises #{threescale_internal_error}" do
-          expect { subject.authorizations(service_id, user_key, reported_metrics) }
+          expect { subject.authorizations(service_id, credentials, reported_metrics) }
               .to raise_error threescale_internal_error
         end
       end
@@ -299,6 +297,19 @@ module Xcflushd
 
           reported_metrics = [parent, children[:unlimited]]
           include_examples 'app with hierarchies defined', reported_metrics, expected_auths
+        end
+      end
+
+      context 'when the credentials are for oauth' do
+        let(:credentials) { Credentials.new(access_token: 'my_token') }
+
+        it 'calls the correct method of the 3scale client' do
+          expect(threescale_client)
+              .to receive(:oauth_authorize)
+              .with({ service_id: service_id }.merge(credentials.creds))
+              .and_return(authorize_response)
+
+          subject.authorizations(service_id, credentials, reported_metrics)
         end
       end
     end
