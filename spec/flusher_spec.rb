@@ -45,8 +45,10 @@ module Xcflushd
 
       describe 'when there are pending reports to flush' do
         let(:apps) do
-          { app1: { service_id: 's1', user_key: 'uk1' },
-            app2: { service_id: 's2', user_key: 'uk2' } }
+          { app1: { service_id: 's1',
+                    credentials: Credentials.new(user_key: 'uk1') },
+            app2: { service_id: 's2',
+                    credentials: Credentials.new(user_key: 'uk2') } }
         end
 
         let(:usages) do
@@ -71,7 +73,7 @@ module Xcflushd
           apps.each do |app, id|
             allow(authorizer)
                 .to receive(:authorizations)
-                .with(id[:service_id], id[:user_key], usages[app].keys)
+                .with(id[:service_id], id[:credentials], usages[app].keys)
                 .and_return(authorizations[app])
             end
         end
@@ -84,7 +86,11 @@ module Xcflushd
               .exactly(apps.size).times
 
           pending_reports.each do |pending_report|
-            expect(reporter).to have_received(:report).with(pending_report)
+            expect(reporter)
+                .to have_received(:report)
+                .with(pending_report[:service_id],
+                      pending_report[:credentials],
+                      pending_report[:usage])
           end
         end
 
@@ -99,7 +105,7 @@ module Xcflushd
             expect(storage)
                 .to have_received(:renew_auths)
                 .with(id[:service_id],
-                      id[:user_key],
+                      id[:credentials],
                       authorizations[app],
                       auth_valid_min)
           end
@@ -107,8 +113,14 @@ module Xcflushd
       end
 
       context 'when there is an error reporting' do
+        let(:service_id) { 'a_service_id' }
+        let(:credentials) { Credentials.new(user_key: 'uk1') }
+        let(:usage) { { 'hits' => 1 } }
+
         let(:report) do
-          { service_id: 's1', user_key: 'uk1', usage: { 'hits' => 1 } }
+          { service_id: service_id,
+            credentials: credentials,
+            usage: usage }
         end
 
         let(:pending_reports) { [report] }
@@ -117,7 +129,7 @@ module Xcflushd
         before do
           allow(reporter)
               .to receive(:report)
-              .with(report)
+              .with(service_id, credentials, usage)
               .and_raise(exception)
         end
 
@@ -131,11 +143,15 @@ module Xcflushd
 
       context 'when there is an error authorizing' do
         let(:failed_auth_report) do
-          { service_id: 's1', user_key: 'uk1', usage: { 'hits' => 1 } }
+          { service_id: 's1',
+            credentials: Credentials.new(user_key: 'uk1'),
+            usage: { 'hits' => 1 } }
         end
 
         let(:ok_auth_report) do
-          { service_id: 's2', user_key: 'uk2', usage: { 'hits' => 1 } }
+          { service_id: 's2',
+            credentials: Credentials.new(user_key: 'uk2'),
+            usage: { 'hits' => 1 } }
         end
 
         let(:pending_reports) { [failed_auth_report, ok_auth_report] }
@@ -146,14 +162,14 @@ module Xcflushd
           allow(authorizer)
               .to receive(:authorizations)
               .with(failed_auth_report[:service_id],
-                    failed_auth_report[:user_key],
+                    failed_auth_report[:credentials],
                     failed_auth_report[:usage].keys)
               .and_raise(exception)
 
           allow(authorizer)
               .to receive(:authorizations)
               .with(ok_auth_report[:service_id],
-                    ok_auth_report[:user_key],
+                    ok_auth_report[:credentials],
                     ok_auth_report[:usage].keys)
               .and_return(auths_for_ok_report)
         end
@@ -171,7 +187,7 @@ module Xcflushd
           expect(storage)
               .to have_received(:renew_auths)
               .with(ok_auth_report[:service_id],
-                    ok_auth_report[:user_key],
+                    ok_auth_report[:credentials],
                     auths_for_ok_report,
                     auth_valid_min)
         end
