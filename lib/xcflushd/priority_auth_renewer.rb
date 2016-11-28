@@ -2,7 +2,7 @@ module Xcflushd
   # Apart from flushing all the cached reports and renewing the authorizations
   # periodically, we need to provide a mechanism to renew a specific auth at
   # any time. The information needed is the combination of service, application
-  # and metric.
+  # credentials and metric.
   #
   # When the client looks for the auth of a combination in the cache, it might
   # not be there. It could be an authorization that has never been cached or one
@@ -19,12 +19,6 @@ module Xcflushd
   #      subscribed to this channel, and xcflushd will publish the authorization
   #      status once it gets it from 3scale.
   class PriorityAuthRenewer
-
-    AUTH_REQUESTS_CHANNEL = 'xc_channel_auth_requests'.freeze
-    private_constant :AUTH_REQUESTS_CHANNEL
-
-    AUTH_RESPONSES_CHANNEL_PREFIX = 'xc_channel_auth_response:'.freeze
-    private_constant :AUTH_RESPONSES_CHANNEL_PREFIX
 
     # Number of times that a response is published
     TIMES_TO_PUBLISH = 5
@@ -72,7 +66,7 @@ module Xcflushd
                 :logger, :current_auths, :thread_pool
 
     def subscribe_to_requests_channel
-      redis_sub.subscribe(AUTH_REQUESTS_CHANNEL) do |on|
+      redis_sub.subscribe(StorageKeys::AUTH_REQUESTS_CHANNEL) do |on|
         on.message do |_channel, msg|
           begin
             # The renew and publish operations need to be done asynchronously.
@@ -117,7 +111,7 @@ module Xcflushd
         begin
           combination = auth_channel_msg_2_combination(channel_msg)
           app_auths = app_authorizations(combination)
-          renew(combination[:service_id], combination[:user_key], app_auths)
+          renew(combination[:service_id], combination[:credentials], app_auths)
           metric_auth = app_auths[combination[:metric]]
         rescue StandardError
           # If we do not do rescue, we would not be able to process the same
@@ -137,26 +131,24 @@ module Xcflushd
       end
     end
 
-    # A message in the auth channel requests has this format:
-    # "#{service_id}:#{user_key}:#{metric}"
     def auth_channel_msg_2_combination(msg)
-      service_id, user_key, metric = msg.split(':'.freeze)
-      { service_id: service_id, user_key: user_key, metric: metric }
+      StorageKeys.pubsub_auth_msg_2_auth_info(msg)
     end
 
     def app_authorizations(combination)
       authorizer.authorizations(combination[:service_id],
-                                combination[:user_key],
+                                combination[:credentials],
                                 [combination[:metric]])
     end
 
-    def renew(service_id, user_key, auths)
-      storage.renew_auths(service_id, user_key, auths, auth_valid_min)
+    def renew(service_id, credentials, auths)
+      storage.renew_auths(service_id, credentials, auths, auth_valid_min)
     end
 
     def channel_for_combination(combination)
-      "#{AUTH_RESPONSES_CHANNEL_PREFIX}#{combination[:service_id]}:"\
-        "#{combination[:user_key]}:#{combination[:metric]}"
+      StorageKeys.pubsub_auths_resp_channel(combination[:service_id],
+                                            combination[:credentials],
+                                            combination[:metric])
     end
 
     def publish_auth_repeatedly(combination, authorization)
