@@ -1,6 +1,8 @@
 require 'xcflushd/logger'
 require 'xcflushd/flusher'
 require 'xcflushd/authorization'
+require 'xcflushd/storage_keys'
+require 'xcflushd/credentials'
 require 'xcflushd/authorizer'
 require 'xcflushd/reporter'
 require 'xcflushd/storage'

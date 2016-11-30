@@ -5,13 +5,9 @@ module Xcflushd
   describe Reporter do
     describe '#report' do
       let(:service_id) { 'a_service_id' }
-
-      let(:transaction) do
-        { user_key: 'a_user_key',
-          usage: { 'metric1' => 1, 'metric2' => 2 } }
-      end
-
-      let(:application_usage) { transaction.merge(service_id: service_id) }
+      let(:credentials) { Credentials.new(user_key: 'a_user_key') }
+      let(:usage) { { 'metric1' => 1, 'metric2' => 2 } }
+      let(:transaction) { credentials.creds.merge(usage: usage) }
 
       let(:threescale_client) { double('ThreeScale::Client') }
       subject { described_class.new(threescale_client) }
@@ -31,7 +27,7 @@ module Xcflushd
               .with(transactions: [transaction], service_id: service_id)
               .and_return(report_response)
 
-          expect(subject.report(application_usage)).to be true
+          expect(subject.report(service_id, credentials, usage)).to be true
         end
       end
 
@@ -43,7 +39,7 @@ module Xcflushd
                 .with(transactions: [transaction], service_id: service_id)
                 .and_raise(ThreeScale::ServerError.new('error_msg'))
 
-            expect { subject.report(application_usage) }
+            expect { subject.report(service_id, credentials, usage) }
                 .to raise_error errors[:internal]
           end
         end
@@ -55,7 +51,7 @@ module Xcflushd
                 .with(transactions: [transaction], service_id: service_id)
                 .and_raise(ArgumentError)
 
-            expect { subject.report(application_usage) }
+            expect { subject.report(service_id, credentials, usage) }
                 .to raise_error errors[:bad_params]
           end
         end
@@ -74,7 +70,7 @@ module Xcflushd
                 .with(transactions: [transaction], service_id: service_id)
                 .and_return(report_response)
 
-            expect { subject.report(application_usage) }
+            expect { subject.report(service_id, credentials, usage) }
                 .to raise_error errors[:auth]
           end
         end

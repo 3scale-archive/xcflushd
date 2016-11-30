@@ -44,9 +44,8 @@ module Xcflushd
       @threescale_client = threescale_client
     end
 
-    def report(application_usage)
-      service_id = application_usage[:service_id]
-      transaction = application_usage.reject { |k, _v| k == :service_id }
+    def report(service_id, credentials, usage)
+      transaction = credentials.creds.merge(usage: usage)
 
       begin
         resp = threescale_client.report(transactions: [transaction],

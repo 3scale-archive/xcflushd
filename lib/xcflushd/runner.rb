@@ -11,7 +11,7 @@ module Xcflushd
         redis = Redis.new(
             host: opts[:redis_host], port: opts[:redis_port], driver: :hiredis)
         logger = Logger.new(STDOUT)
-        storage = Storage.new(redis, logger)
+        storage = Storage.new(redis, logger, StorageKeys)
         threescale = ThreeScale::Client.new(provider_key: opts[:provider_key],
                                             host: opts[:threescale_host],
                                             port: opts[:threescale_port],

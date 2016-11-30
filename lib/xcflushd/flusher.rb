@@ -69,7 +69,7 @@ module Xcflushd
 
         if auth_task.fulfilled?
           auths << { service_id: report[:service_id],
-                     user_key: report[:user_key],
+                     credentials: report[:credentials],
                      auths: auth }
         else
           failed[report] = auth_task.reason
@@ -85,7 +85,7 @@ module Xcflushd
       authorizations.each do |authorization|
         begin
           storage.renew_auths(authorization[:service_id],
-                              authorization[:user_key],
+                              authorization[:credentials],
                               authorization[:auths],
                               auth_valid_min)
         rescue Storage::RenewAuthError => e
@@ -97,7 +97,9 @@ module Xcflushd
     def async_report_tasks(reports)
       reports.map do |report|
         task = Concurrent::Future.new(executor: thread_pool) do
-          reporter.report(report)
+          reporter.report(report[:service_id],
+                          report[:credentials],
+                          report[:usage])
         end
         [report, task]
       end.to_h
@@ -115,7 +117,7 @@ module Xcflushd
       reports.map do |report|
         task = Concurrent::Future.new(executor: thread_pool) do
           authorizer.authorizations(report[:service_id],
-                                    report[:user_key],
+                                    report[:credentials],
                                     report[:usage].keys)
         end
         [report, task]

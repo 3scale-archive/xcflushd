@@ -7,9 +7,9 @@ module Xcflushd
     # but it returns a ServerError. Most of the time this means that 3scale is
     # down.
     class ThreeScaleInternalError < Flusher::XcflushdError
-      def initialize(service_id, user_key)
+      def initialize(service_id, credentials)
         super("Error renewing auths of service with ID #{service_id} "\
-              "and user_key #{user_key}. 3scale seems to be down")
+              "and credentials #{credentials}. 3scale seems to be down")
       end
     end
 
@@ -18,19 +18,26 @@ module Xcflushd
     end
 
     # Returns the authorization status of all the limited metrics of the
-    # application identified by the received (service_id, user_key) pair and
+    # application identified by the received (service_id, credentials) pair and
     # also, the authorization of those metrics passed in reported_metrics that
     # are not limited.
     #
     # @return Array<Authorization>
-    def authorizations(service_id, user_key, reported_metrics)
+    def authorizations(service_id, credentials, reported_metrics)
       # We can safely assume that reported metrics that do not have an
       # associated report usage are non-limited metrics.
 
       # First, let's check if there is a problem that has nothing to do with
-      # limits (disabled application, bad user_key, etc.).
-      auth = with_3scale_error_rescue(service_id, user_key) do
-        threescale_client.authorize(service_id: service_id, user_key: user_key)
+      # limits (disabled application, bad credentials, etc.).
+      auth = with_3scale_error_rescue(service_id, credentials) do
+        auths_params = { service_id: service_id }
+        auths_params.merge!(credentials.creds)
+
+        if credentials.oauth?
+          threescale_client.oauth_authorize(auths_params)
+        else
+          threescale_client.authorize(auths_params)
+        end
       end
 
       if !auth.success? && !auth.limits_exceeded?
@@ -100,10 +107,10 @@ module Xcflushd
       end
     end
 
-    def with_3scale_error_rescue(service_id, user_key)
+    def with_3scale_error_rescue(service_id, credentials)
       yield
     rescue ThreeScale::ServerError
-      raise ThreeScaleInternalError.new(service_id, user_key)
+      raise ThreeScaleInternalError.new(service_id, credentials)
     end
   end
 end

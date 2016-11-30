@@ -13,7 +13,8 @@ module Xcflushd
     let(:authorizer) { double('authorizer') }
     let(:redis_storage) { Redis.new }
     let(:logger) { double('logger', warn: true, error: true) }
-    let(:storage) { Storage.new(redis_storage, logger) }
+    let(:storage_keys) { StorageKeys }
+    let(:storage) { Storage.new(redis_storage, logger, storage_keys) }
     let(:redis_pub) { Redis.new }
     let(:redis_sub) { Redis.new }
     let(:auth_valid_min) { 10 }
@@ -23,26 +24,28 @@ module Xcflushd
           authorizer, storage, redis_pub, redis_sub, auth_valid_min, logger)
     end
 
-    let(:auth_requests_channel) do
-      described_class.const_get(:AUTH_REQUESTS_CHANNEL)
-    end
-
-    let(:responses_channel_prefix) do
-      described_class.const_get(:AUTH_RESPONSES_CHANNEL_PREFIX)
-    end
+    let(:auth_requests_channel) { storage_keys::AUTH_REQUESTS_CHANNEL }
 
     let(:service_id) { 'a_service_id' }
-    let(:user_key) { 'a_user_key' }
+    let(:credentials) { Credentials.new(user_key: 'a_user_key') }
     let(:metric) { 'a_metric' }
 
-    let(:requests_channel_msg) { "#{service_id}:#{user_key}:#{metric}" }
+    let(:auth_hash_key) { storage_keys.auth_hash_key(service_id, credentials) }
+
+    let(:requests_channel_msg) do
+      "service_id:#{service_id}," +
+          "#{credentials.to_sorted_escaped_s}," +
+          "metric:#{metric}"
+    end
+
     let(:responses_channel) do
-      "#{responses_channel_prefix}#{requests_channel_msg}"
+      storage_keys.pubsub_auths_resp_channel(service_id, credentials, metric)
     end
 
     let(:other_app_metrics_auths) do
       { 'metric2' => Authorization.allow, 'metric3' => Authorization.allow }
     end
+
     let(:authorizations) { metric_auth.merge(other_app_metrics_auths) }
 
     before do
@@ -54,8 +57,7 @@ module Xcflushd
 
     shared_examples 'authorization to be renewed' do |auth|
       it 'renews its cached authorization' do
-        cached_auth = redis_storage.hget(
-            "auth:#{service_id}:#{user_key}", metric)
+        cached_auth = redis_storage.hget(auth_hash_key, metric)
         expect(cached_auth).to eq auth
       end
 
@@ -67,8 +69,7 @@ module Xcflushd
 
       it 'renews the auth for all the limited metrics of the app' do
         other_app_metrics_auths.each do |other_metric, other_auth|
-          cached_auth = redis_storage.hget(
-              "auth:#{service_id}:#{user_key}", other_metric)
+          cached_auth = redis_storage.hget(auth_hash_key, other_metric)
           expect(cached_auth).to eq(other_auth.authorized? ? '1' : '0')
         end
       end
@@ -82,7 +83,7 @@ module Xcflushd
       before do
         allow(authorizer)
             .to receive(:authorizations)
-            .with(service_id, user_key, [metric])
+            .with(service_id, credentials, [metric])
             .and_return(authorizations)
 
         subject.start
@@ -163,7 +164,7 @@ module Xcflushd
 
         allow(authorizer)
             .to receive(:authorizations)
-            .with(service_id, user_key, [metric])
+            .with(service_id, credentials, [metric])
             .and_return(authorizations)
       end
 
