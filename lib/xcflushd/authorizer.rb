@@ -55,7 +55,7 @@ module Xcflushd
     attr_reader :threescale_client
 
     def next_hit_auth?(usages)
-      usages.all? { |usage| usage.current_value + 1 <= usage.max_value }
+      usages.all? { |usage| usage.current_value < usage.max_value }
     end
 
     def usage_reports(auth, reported_metrics)
