@@ -13,6 +13,11 @@ module Xcflushd
       end
     end
 
+    # Extensions used by the Authorizer
+    # In our case we want 3scale to respond with the hierarchy
+    EXTENSIONS = { hierarchy: 1 }.freeze
+    private_constant :EXTENSIONS
+
     def initialize(threescale_client)
       @threescale_client = threescale_client
     end
@@ -30,8 +35,8 @@ module Xcflushd
       # First, let's check if there is a problem that has nothing to do with
       # limits (disabled application, bad credentials, etc.).
       auth = with_3scale_error_rescue(service_id, credentials) do
-        auths_params = { service_id: service_id }
-        auths_params.merge!(credentials.creds)
+        auths_params = { service_id: service_id,
+                         extensions: EXTENSIONS }.merge!(credentials.creds)
 
         if credentials.oauth?
           threescale_client.oauth_authorize(auths_params)
