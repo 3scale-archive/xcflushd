@@ -64,10 +64,10 @@ module Xcflushd
       #   separated by ','. For example: app_id:my_app_id,user_key:my_user_key.
       def pubsub_auth_msg_2_auth_info(msg)
         msg_split = msg.split(/(?<!\\),/)
-        service_id = msg_split[0].sub('service_id:'.freeze, ''.freeze)
+        service_id = msg_split.first.sub('service_id:'.freeze, ''.freeze)
         creds = Credentials.from(
-            msg_split[1].sub('credentials:'.freeze, ''.freeze))
-        metric = msg_split[2].sub('metric:'.freeze, ''.freeze)
+            msg_split[1..-2].join(',').sub('credentials:'.freeze, ''.freeze))
+        metric = msg_split.last.sub('metric:'.freeze, ''.freeze)
 
         res = { service_id: service_id, credentials: creds, metric: metric }
         res.map do |k, v|
