@@ -66,12 +66,12 @@ $ docker run --rm xcflushd bundle exec exe/xcflushd run -h
 
 You can send the options as params in the `exe/xcflushd` command:
 ```
-$ docker run --rm xcflushd bundle exec exe/xcflushd run --auth-valid-minutes=15 --provider-key=my_provider_key --redis-host=127.0.0.1 --redis-port=6379 --reporting-freq-minutes=5 --threescale-host=su1.3scale.net --threescale-port=80
+$ docker run --rm xcflushd bundle exec exe/xcflushd run --auth-valid-minutes=15 --provider-key=my_provider_key --redis-host=127.0.0.1 --redis-port=6379 --reporting-freq-minutes=5 --threescale-host=su1.3scale.net --threescale-port=443
 ```
 
 You can also use environment variables like this:
 ```
-$ docker run --rm -e AUTH_VALID_MINUTES=15 -e PROVIDER_KEY=my_provider_key -e REDIS_HOST=127.0.0.1 -e REDIS_PORT=6379 -e REPORTING_FREQ_MINUTES=5 -e THREESCALE_HOST=su1.3scale.net -e THREESCALE_PORT=80 xcflushd
+$ docker run --rm -e AUTH_VALID_MINUTES=15 -e PROVIDER_KEY=my_provider_key -e REDIS_HOST=127.0.0.1 -e REDIS_PORT=6379 -e REPORTING_FREQ_MINUTES=5 -e THREESCALE_HOST=su1.3scale.net -e THREESCALE_PORT=443 xcflushd
 ```
 
 ### Locally
