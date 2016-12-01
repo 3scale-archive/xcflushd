@@ -15,6 +15,7 @@ module Xcflushd
         threescale = ThreeScale::Client.new(provider_key: opts[:provider_key],
                                             host: opts[:threescale_host],
                                             port: opts[:threescale_port],
+                                            secure: true,
                                             persistent: true)
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)
