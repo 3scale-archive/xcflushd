@@ -122,6 +122,17 @@ module Xcflushd
 
         include_examples 'pubsub message', service_id, credentials, metric, msg
       end
+
+      context 'when the message includes several credentials' do
+        service_id = 'a_service_id'
+        credentials = Credentials.new(app_id: 'ai', app_key: 'ak')
+        metric = 'a_metric'
+        msg = "service_id:#{service_id}," +
+            "#{credentials.to_sorted_escaped_s}," + # escapes ':' and ','
+            "metric:#{metric}"
+
+        include_examples 'pubsub message', service_id, credentials, metric, msg
+      end
     end
 
     describe '.service_and_creds' do
