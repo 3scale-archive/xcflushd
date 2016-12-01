@@ -2,7 +2,7 @@ PATH
   remote: .
   specs:
     xcflushd (1.0.0.beta1)
-      3scale_client (~> 2.9.0)
+      3scale_client (~> 2.10.0)
       concurrent-ruby (= 1.0.2)
       daemons (= 1.2.4)
       gli (= 2.14.0)
@@ -13,7 +13,7 @@ PATH
 GEM
   remote: https://rubygems.org/
   specs:
-    3scale_client (2.9.0)
+    3scale_client (2.10.0)
       nokogiri
     concurrent-ruby (1.0.2)
     daemons (1.2.4)

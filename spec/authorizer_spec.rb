@@ -11,6 +11,13 @@ module Xcflushd
 
     threescale_internal_error = described_class::ThreeScaleInternalError
 
+    def authorize_args(service_id, args = {})
+      {
+        service_id: service_id,
+        extensions: described_class.const_get(:EXTENSIONS)
+      }.merge!(args)
+    end
+
     describe '#authorizations' do
       let(:service_id) { 'a_service_id' }
       let(:credentials) { Credentials.new(user_key: 'a_user_key') }
@@ -43,7 +50,7 @@ module Xcflushd
       before do
         allow(threescale_client)
             .to receive(:authorize)
-            .with({ service_id: service_id }.merge(credentials.creds))
+            .with(authorize_args(service_id, credentials.creds))
             .and_return(authorize_response)
       end
 
@@ -149,7 +156,7 @@ module Xcflushd
         before do
           allow(threescale_client)
               .to receive(:authorize)
-              .with({ service_id: service_id }.merge(credentials.creds))
+              .with(authorize_args(service_id, credentials.creds))
               .and_return(authorize_response)
         end
 
@@ -183,7 +190,7 @@ module Xcflushd
         before do
           allow(threescale_client)
               .to receive(:authorize)
-              .with({ service_id: service_id }.merge(credentials.creds))
+              .with(authorize_args(service_id, credentials.creds))
               .and_return(auth_response)
         end
 
@@ -199,7 +206,7 @@ module Xcflushd
         before do
           allow(threescale_client)
               .to receive(:authorize)
-              .with({ service_id: service_id }.merge(credentials.creds))
+              .with(authorize_args(service_id, credentials.creds))
               .and_raise(ThreeScale::ServerError.new('error_msg'))
         end
 
@@ -306,7 +313,7 @@ module Xcflushd
         it 'calls the correct method of the 3scale client' do
           expect(threescale_client)
               .to receive(:oauth_authorize)
-              .with({ service_id: service_id }.merge(credentials.creds))
+              .with(authorize_args(service_id, credentials.creds))
               .and_return(authorize_response)
 
           subject.authorizations(service_id, credentials, reported_metrics)
