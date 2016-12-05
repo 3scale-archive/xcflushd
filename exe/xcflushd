@@ -48,16 +48,19 @@ command :run do |c|
                 'account the new reports.')
     end
 
+    banner = "xcflushd [#{Xcflushd::VERSION}]"
+
     if options[:daemonize]
       require 'daemons'
       begin
-        Daemons.run_proc('xcflush') { start_xcflusher(options) }
+        Daemons.run_proc(banner) { start_xcflusher(options) }
         # When forking, the parent executes 'exit', and GLI thinks that there
         # has been an error. Let's return the correct exit code.
       rescue SystemExit => e
         e.status
       end
     else
+      set_title(banner)
       start_xcflusher(options)
     end
   end

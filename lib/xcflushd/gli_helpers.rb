@@ -47,5 +47,13 @@ module Xcflushd
     def start_xcflusher(options)
       Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
     end
+
+    def set_title(title)
+      if Process.respond_to? :setproctitle
+        Process.setproctitle title
+      else
+        $0 = title
+      end
+    end
   end
 end
