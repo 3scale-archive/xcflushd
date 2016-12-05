@@ -61,10 +61,10 @@ $ make build
 
 Run:
 ```
-$ docker run --rm xcflushd bundle exec exe/xcflushd run -h
+$ docker run --rm xcflushd bundle exec xcflushd help run
 ```
 
-You can send the options as params in the `exe/xcflushd` command:
+You can send the options as params in the `xcflushd` command:
 ```
 $ docker run --rm xcflushd bundle exec exe/xcflushd run --auth-valid-minutes=15 --provider-key=my_provider_key --redis-host=127.0.0.1 --redis-port=6379 --reporting-freq-minutes=5 --threescale-host=su1.3scale.net --threescale-port=443
 ```
@@ -83,7 +83,7 @@ $ bundle install
 
 Run the program:
 ```
-$ bundle exec exe/xcflushd -h
+$ bundle exec xcflushd help
 ```
 
 ### Openshift
