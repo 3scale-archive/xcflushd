@@ -74,13 +74,7 @@ command :run do |c|
 
     if options[:daemonize]
       require 'daemons'
-      begin
-        Daemons.run_proc(banner) { start_xcflusher(options) }
-        # When forking, the parent executes 'exit', and GLI thinks that there
-        # has been an error. Let's return the correct exit code.
-      rescue SystemExit => e
-        e.status
-      end
+      Daemons.run_proc(banner) { start_xcflusher(options) }
     else
       set_title(banner)
       start_xcflusher(options)
@@ -103,10 +97,12 @@ post do |_global, _command, _options, _args|
   # block on that command only
 end
 
-on_error do |_exception|
+on_error do |exception|
   # Error logic here
   # return false to skip default error handling
-  true
+  # When forking, the parent executes 'exit', and GLI error handling kicks in.
+  # Let's just skip it when that's the case.
+  not SystemExit === exception
 end
 
 exit run(ARGV)
