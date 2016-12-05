@@ -5,6 +5,30 @@ module Xcflushd
   module GLIHelpers
     POSITIVE_N_RE = /\A[1-9]\d*\z/.freeze
 
+    class PositiveMinMaxInt
+      # this allows 0 or more as MIN, 1 or more as MAX
+      POSITIVE_MIN_MAX_RE = /\A(?<min>\d+):(?<max>[1-9]\d*)\z/.freeze
+      private_constant :POSITIVE_MIN_MAX_RE
+
+      def self.match(str)
+        md = POSITIVE_MIN_MAX_RE.match str
+        return false if md.nil?
+        min, max = [md[:min].to_i, md[:max].to_i]
+        return false if max < min
+        new min, max
+      end
+
+      attr_reader :min, :max
+
+      def initialize(min, max)
+        @min, @max = min, max
+      end
+
+      def to_a
+        [self]
+      end
+    end
+
     # URI parsing for GLI
     class GenericURI
       # https://tools.ietf.org/html/rfc3986#appendix-A
