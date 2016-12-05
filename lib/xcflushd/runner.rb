@@ -30,16 +30,20 @@ module Xcflushd
         redis_sub = Redis.new(
           host: opts[:redis].host, port: redis_port, driver: :hiredis)
 
-        Thread.new do
-          PriorityAuthRenewer
-            .new(authorizer, storage, redis_pub, redis_sub, opts[:auth_ttl], logger)
-            .start
-        end
-
+        start_priority_auth_renewer(authorizer, storage, redis_pub, redis_sub,
+                                    opts[:auth_ttl], logger)
         flush_periodically(flusher, opts[:frequency], logger)
       end
 
       private
+
+      def start_priority_auth_renewer(authorizer, storage, pub, sub, auth_ttl, logger)
+        Thread.new do
+          PriorityAuthRenewer
+            .new(authorizer, storage, pub, sub, auth_ttl, logger)
+            .start
+        end
+      end
 
       def flush_periodically(flusher, flush_freq_min, logger)
         # TODO: Handle signals. When in the middle of a flush, try to complete
