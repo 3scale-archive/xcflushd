@@ -8,16 +8,27 @@ module Xcflushd
 
     XcflushdError = Class.new(StandardError)
 
-    def initialize(reporter, authorizer, storage, auth_valid_min, error_handler)
+    def self.default_threads_value
+      cpus = Concurrent.processor_count
+      # default thread pool minimum is zero
+      return 0, cpus * 4
+    end
+
+    def initialize(reporter, authorizer, storage, auth_valid_min, error_handler, threads)
       @reporter = reporter
       @authorizer = authorizer
       @storage = storage
       @auth_valid_min = auth_valid_min
       @error_handler = error_handler
 
-      # TODO: tune the pool options.
+      min_threads, max_threads = if threads
+                                   [threads.min, threads.max]
+                                 else
+                                   self.class.default_threads_value
+                                 end
+
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
-          max_threads: Concurrent.processor_count * 4)
+        min_threads: min_threads, max_threads: max_threads)
     end
 
     # TODO: decide if we want to renew the authorizations every time.

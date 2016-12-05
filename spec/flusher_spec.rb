@@ -19,8 +19,13 @@ module Xcflushd
              :handle_renew_auth_error => true)
     end
 
+    let(:threads) do
+      double('threads', :min => 8, :max => 16)
+    end
+
     subject do
-      described_class.new(reporter, authorizer, storage, auth_valid_min, error_handler)
+      described_class.new(reporter, authorizer, storage, auth_valid_min,
+                          error_handler, threads)
     end
 
     before do

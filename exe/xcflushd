@@ -31,6 +31,9 @@ command :run do |c|
   c.desc 'Reporting frequency (in minutes)'
   c.flag [:f, :frequency], required: true, type: Integer, must_match: POSITIVE_N_RE
 
+  c.desc 'Thread pool minimum and maximum number of threads (min:max)'
+  c.flag [:t, :threads], default_value: 'auto', type: PositiveMinMaxInt
+
   c.desc 'Run this program as a background service'
   c.switch :daemonize, default_value: false, negatable: true, multiple: true
 
@@ -46,6 +49,16 @@ command :run do |c|
       exit_now!('frequency needs to be <= auth-ttl. '\
                 'Otherwise, auths would be renewed without taking into '\
                 'account the new reports.')
+    end
+
+    if options[:threads] == 'auto'
+      options.delete :threads
+      options.delete :t
+    end
+
+    if options[:prio_threads] == 'auto'
+      options.delete :threads
+      options.delete 'threads'
     end
 
     banner = "xcflushd [#{Xcflushd::VERSION}]"

@@ -21,8 +21,8 @@ module Xcflushd
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)
         error_handler = FlusherErrorHandler.new(logger, storage)
-        flusher = Flusher.new(
-            reporter, authorizer, storage, opts[:auth_ttl], error_handler)
+        flusher = Flusher.new(reporter, authorizer, storage,
+                              opts[:auth_ttl], error_handler, opts[:threads])
 
         Thread.new do
           redis_pub = Redis.new(
