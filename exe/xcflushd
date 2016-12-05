@@ -48,10 +48,13 @@ command :run do |c|
     # For simplicity, let's just keep the elements that have symbols as keys.
     options.keep_if { |k, _v| k.is_a?(Symbol) }
 
+    # Reporting frequency should be lower or equal to the authorization TTL.
+    # Otherwise authorizations would be renewed without taking into account the
+    # last available reports. Note: whenever we do reporting we also do renewal
+    # of authorizations; the TTL is important in case of problems renewing
+    # authorizations.
     if options[:frequency] > options[:'auth-ttl']
-      exit_now!('frequency needs to be <= auth-ttl. '\
-                'Otherwise, auths would be renewed without taking into '\
-                'account the new reports.')
+      exit_now!('frequency needs to be <= auth-ttl')
     end
 
     if (options[:backend].scheme == 'http' && options[:secure]) ||
