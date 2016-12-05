@@ -1,15 +1,10 @@
 #!/usr/bin/env ruby
 require 'gli'
 require 'redis'
-require 'xcflushd/runner'
 require 'xcflushd/gli_helpers'
 
 include GLI::App
 include Xcflushd::GLIHelpers
-
-def start_xcflusher(options)
-  Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
-end
 
 program_desc 'XC flush daemon'
 

@@ -1,4 +1,5 @@
 require 'uri'
+require 'xcflushd/runner'
 
 module Xcflushd
   module GLIHelpers
@@ -41,6 +42,10 @@ module Xcflushd
       def self.match(s)
         GenericURI.new(s)
       end
+    end
+
+    def start_xcflusher(options)
+      Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
     end
   end
 end
