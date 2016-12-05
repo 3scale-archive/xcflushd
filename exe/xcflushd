@@ -48,7 +48,7 @@ command :run do |c|
     # For simplicity, let's just keep the elements that have symbols as keys.
     options.keep_if { |k, _v| k.is_a?(Symbol) }
 
-    if options[:frequency] >= options[:'auth-ttl']
+    if options[:frequency] > options[:'auth-ttl']
       exit_now!('frequency needs to be <= auth-ttl. '\
                 'Otherwise, auths would be renewed without taking into '\
                 'account the new reports.')
