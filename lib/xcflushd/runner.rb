@@ -15,8 +15,9 @@ module Xcflushd
         storage = Storage.new(redis, logger, StorageKeys)
         threescale = ThreeScale::Client.new(provider_key: opts[:provider_key],
                                             host: opts[:backend].host,
-                                            port: opts[:backend].port || 443,
-                                            secure: true,
+                                            port: opts[:backend].port ||
+                                              (opts[:secure] ? 443 : 80),
+                                            secure: opts[:secure],
                                             persistent: true)
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)

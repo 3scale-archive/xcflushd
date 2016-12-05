@@ -37,6 +37,9 @@ command :run do |c|
   c.desc 'Run this program as a background service'
   c.switch :daemonize, default_value: false, negatable: true, multiple: true
 
+  c.desc 'Use HTTPS scheme to connect to 3scale backend'
+  c.switch :secure, default_value: true, negatable: true, multiple: true
+
   c.action do |_global_options, options, _args|
     # options contains 2 keys for each option. One is a String and the other a
     # Symbol. That way we can use options['redis'] and options[:redis].
@@ -49,6 +52,12 @@ command :run do |c|
       exit_now!('frequency needs to be <= auth-ttl. '\
                 'Otherwise, auths would be renewed without taking into '\
                 'account the new reports.')
+    end
+
+    if (options[:backend].scheme == 'http' && options[:secure]) ||
+        (options[:backend].scheme == 'https' && !options[:secure])
+      exit_now!("the specified backend scheme does not match the --[no-]secure" \
+                " flag.\nCan't continue with conflicting settings.")
     end
 
     if options[:threads] == 'auto'
