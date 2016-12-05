@@ -8,13 +8,14 @@ module Xcflushd
     class << self
 
       def run(opts = {})
+        redis_port = opts[:redis].port
         redis = Redis.new(
-            host: opts[:redis_host], port: opts[:redis_port], driver: :hiredis)
+          host: opts[:redis].host, port: redis_port, driver: :hiredis)
         logger = Logger.new(STDOUT)
         storage = Storage.new(redis, logger, StorageKeys)
         threescale = ThreeScale::Client.new(provider_key: opts[:provider_key],
-                                            host: opts[:threescale_host],
-                                            port: opts[:threescale_port],
+                                            host: opts[:backend].host,
+                                            port: opts[:backend].port || 443,
                                             secure: true,
                                             persistent: true)
         reporter = Reporter.new(threescale)
@@ -25,12 +26,12 @@ module Xcflushd
 
         Thread.new do
           redis_pub = Redis.new(
-              host: opts[:redis_host], port: opts[:redis_port], driver: :hiredis)
+            host: opts[:redis].host, port: redis_port, driver: :hiredis)
           redis_sub = Redis.new(
-              host: opts[:redis_host], port: opts[:redis_port], driver: :hiredis)
+            host: opts[:redis].host, port: redis_port, driver: :hiredis)
           PriorityAuthRenewer
-              .new(authorizer, storage, redis_pub, redis_sub, opts[:auth_ttl], logger)
-              .start
+            .new(authorizer, storage, redis_pub, redis_sub, opts[:auth_ttl], logger)
+            .start
         end
 
         flush_periodically(flusher, opts[:frequency], logger)

@@ -2,13 +2,12 @@
 require 'gli'
 require 'redis'
 require 'xcflushd/runner'
+require 'xcflushd/gli_helpers'
 
 include GLI::App
+include Xcflushd::GLIHelpers
 
 def start_xcflusher(options)
-  int_opt_fields = [:'threescale-port', :'redis-port',
-                    :'auth-ttl', :'report-freq']
-  int_opt_fields.each { |opt| options[opt] = options[opt].to_i }
   Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
 end
 
@@ -22,40 +21,33 @@ arguments :strict
 desc 'Starts the daemon'
 arg_name 'Describe arguments to run here'
 command :run do |c|
-  c.desc 'Redis host'
-  c.flag :'redis-host', required: true
+  c.desc 'Redis URI'
+  c.flag [:r, :redis], required: true, type: RedisURI
 
-  c.desc 'Redis port'
-  c.flag :'redis-port', required: true
-
-  c.desc '3scale backend host'
-  c.flag :'threescale-host', required: true
-
-  c.desc '3scale backend port'
-  c.flag :'threescale-port', required: true
+  c.desc '3scale backend URI'
+  c.flag [:b, :backend], required: true, type: BackendURI
 
   c.desc '3scale provider key'
-  c.flag :'provider-key', required: true
+  c.flag [:k, :'provider-key'], required: true
 
   c.desc 'Validity of authorizations (in minutes)'
-  c.flag :'auth-ttl', required: true
+  c.flag [:a, :'auth-ttl'], required: true, type: Integer, must_match: POSITIVE_N_RE
 
   c.desc 'Reporting frequency (in minutes)'
-  c.flag :frequency, required: true
+  c.flag [:f, :frequency], required: true, type: Integer, must_match: POSITIVE_N_RE
 
-  c.desc 'Daemonize'
-  c.switch :daemonize
+  c.desc 'Run this program as a background service'
+  c.switch :daemonize, default_value: false, negatable: true, multiple: true
 
   c.action do |_global_options, options, _args|
     # options contains 2 keys for each option. One is a String and the other a
-    # Symbol. That way we can use options['redis-host'] and
-    # options[:'redis-host']. That's fine as long as we only read from the
-    # hash. If we need to modify it, it is problematic because we need to
-    # remember to modify two values. For simplicity, let's just keep the
-    # elements that have symbols as keys.
+    # Symbol. That way we can use options['redis'] and options[:redis].
+    # That's fine as long as we only read from the hash. If we need to modify
+    # it, it is problematic because we need to remember to modify two values.
+    # For simplicity, let's just keep the elements that have symbols as keys.
     options.keep_if { |k, _v| k.is_a?(Symbol) }
 
-    if options[:frequency].to_i >= options[:'auth-ttl'].to_i
+    if options[:frequency] >= options[:'auth-ttl']
       exit_now!('frequency needs to be <= auth-ttl. '\
                 'Otherwise, auths would be renewed without taking into '\
                 'account the new reports.')
