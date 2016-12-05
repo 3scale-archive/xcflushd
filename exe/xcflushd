@@ -13,8 +13,8 @@ version Xcflushd::VERSION
 subcommand_option_handling :normal
 arguments :strict
 
-desc 'Starts the daemon'
-arg_name 'Describe arguments to run here'
+desc 'Starts the XC flusher'
+arg_name ' '
 command :run do |c|
   c.desc 'Redis URI'
   c.flag [:r, :redis], required: true, type: RedisURI
