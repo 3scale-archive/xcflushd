@@ -21,7 +21,7 @@ module Xcflushd
         authorizer = Authorizer.new(threescale)
         error_handler = FlusherErrorHandler.new(logger, storage)
         flusher = Flusher.new(
-            reporter, authorizer, storage, opts[:auth_valid_minutes], error_handler)
+            reporter, authorizer, storage, opts[:auth_ttl], error_handler)
 
         Thread.new do
           redis_pub = Redis.new(
@@ -29,11 +29,11 @@ module Xcflushd
           redis_sub = Redis.new(
               host: opts[:redis_host], port: opts[:redis_port], driver: :hiredis)
           PriorityAuthRenewer
-              .new(authorizer, storage, redis_pub, redis_sub, opts[:auth_valid_minutes], logger)
+              .new(authorizer, storage, redis_pub, redis_sub, opts[:auth_ttl], logger)
               .start
         end
 
-        flush_periodically(flusher, opts[:reporting_freq_minutes], logger)
+        flush_periodically(flusher, opts[:frequency], logger)
       end
 
       private

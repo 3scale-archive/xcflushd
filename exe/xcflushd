@@ -7,7 +7,7 @@ include GLI::App
 
 def start_xcflusher(options)
   int_opt_fields = [:'threescale-port', :'redis-port',
-                    :'auth-valid-minutes', :'reporting-freq-minutes']
+                    :'auth-ttl', :'report-freq']
   int_opt_fields.each { |opt| options[opt] = options[opt].to_i }
   Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
 end
@@ -38,10 +38,10 @@ command :run do |c|
   c.flag :'provider-key', required: true
 
   c.desc 'Validity of authorizations (in minutes)'
-  c.flag :'auth-valid-minutes', required: true
+  c.flag :'auth-ttl', required: true
 
   c.desc 'Reporting frequency (in minutes)'
-  c.flag :'reporting-freq-minutes', required: true
+  c.flag :frequency, required: true
 
   c.desc 'Daemonize'
   c.switch :daemonize
@@ -55,8 +55,8 @@ command :run do |c|
     # elements that have symbols as keys.
     options.keep_if { |k, _v| k.is_a?(Symbol) }
 
-    if options[:'reporting-freq-minutes'].to_i >= options[:'auth-valid-minutes'].to_i
-      exit_now!('reporting-freq-minutes needs to be <= auth-valid-minutes. '\
+    if options[:frequency].to_i >= options[:'auth-ttl'].to_i
+      exit_now!('frequency needs to be <= auth-ttl. '\
                 'Otherwise, auths would be renewed without taking into '\
                 'account the new reports.')
     end
