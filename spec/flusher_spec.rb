@@ -6,7 +6,7 @@ module Xcflushd
   describe Flusher do
     let(:reporter) { double('reporter', report: true) }
     let(:authorizer) { double('authorizer', authorizations: true) }
-    let(:auth_valid_min) { 10 }
+    let(:auth_valid_secs) { 10 * 60 }
 
     let(:storage) do
       double('storage', renew_auths: true, reports_to_flush: pending_reports)
@@ -24,7 +24,7 @@ module Xcflushd
     end
 
     subject do
-      described_class.new(reporter, authorizer, storage, auth_valid_min,
+      described_class.new(reporter, authorizer, storage, auth_valid_secs,
                           error_handler, threads)
     end
 
@@ -112,7 +112,7 @@ module Xcflushd
                 .with(id[:service_id],
                       id[:credentials],
                       authorizations[app],
-                      auth_valid_min)
+                      auth_valid_secs)
           end
         end
       end
@@ -194,7 +194,7 @@ module Xcflushd
               .with(ok_auth_report[:service_id],
                     ok_auth_report[:credentials],
                     auths_for_ok_report,
-                    auth_valid_min)
+                    auth_valid_secs)
         end
       end
 

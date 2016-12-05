@@ -324,7 +324,7 @@ module Xcflushd
       let(:service_id) { 'a_service_id' }
       let(:credentials) { Credentials.new(user_key: 'a_user_key') }
       let(:auth_hash_key) { auth_key(service_id, credentials) }
-      let(:valid_min) { 5 }
+      let(:valid_secs) { 5*60 }
       let(:authorized_metrics) { %w(am1 am2) }
       let(:non_authorized_metrics) { %w(nam1 nam2) }
       let(:denied_auths_with_a_reason) do
@@ -340,29 +340,29 @@ module Xcflushd
 
       context 'when there are no errors' do
         it 'renews the authorization of the authorized metrics' do
-          subject.renew_auths(service_id, credentials, authorizations, valid_min)
+          subject.renew_auths(service_id, credentials, authorizations, valid_secs)
           authorized_metrics.each do |metric|
             expect(redis.hget(auth_hash_key, metric)).to eq '1'
           end
         end
 
         it 'renews the authorization of the non-authorized metrics' do
-          subject.renew_auths(service_id, credentials, authorizations, valid_min)
+          subject.renew_auths(service_id, credentials, authorizations, valid_secs)
           non_authorized_metrics.each do |metric|
             expect(redis.hget(auth_hash_key, metric)).to eq '0'
           end
         end
 
         it 'renews the authorization of denied metrics specifying the reason' do
-          subject.renew_auths(service_id, credentials, authorizations, valid_min)
+          subject.renew_auths(service_id, credentials, authorizations, valid_secs)
           denied_auths_with_a_reason.each do |metric, auth|
             expect(redis.hget(auth_hash_key, metric)).to eq "0:#{auth.reason}"
           end
         end
 
         it 'sets a TTL for the hash that contains the auths of the application' do
-          subject.renew_auths(service_id, credentials, authorizations, valid_min)
-          expect(redis.ttl(auth_hash_key)).to be_between(0, valid_min*60)
+          subject.renew_auths(service_id, credentials, authorizations, valid_secs)
+          expect(redis.ttl(auth_hash_key)).to be_between(0, valid_secs)
         end
       end
 
@@ -371,7 +371,7 @@ module Xcflushd
         before { allow(redis).to receive(:hset).and_raise(Redis::BaseError) }
 
         it "raises a #{renew_auth_error}" do
-          expect { subject.renew_auths(service_id, credentials, authorizations, valid_min) }
+          expect { subject.renew_auths(service_id, credentials, authorizations, valid_secs) }
               .to raise_error(renew_auth_error)
         end
       end
