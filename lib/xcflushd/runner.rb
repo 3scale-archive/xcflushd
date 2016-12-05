@@ -45,7 +45,7 @@ module Xcflushd
         end
       end
 
-      def flush_periodically(flusher, flush_freq_min, logger)
+      def flush_periodically(flusher, flush_freq, logger)
         # TODO: Handle signals. When in the middle of a flush, try to complete
         # it before exiting.
         loop do
@@ -54,7 +54,7 @@ module Xcflushd
           flusher.flush
           flusher_runtime = Time.now - start_time
           logger.info("Flush completed in #{flusher_runtime} seconds")
-          time_remaining_sec = flush_freq_min*60 - flusher_runtime
+          time_remaining_sec = flush_freq - flusher_runtime
           sleep(time_remaining_sec) if time_remaining_sec > 0
         end
       rescue StandardError => e

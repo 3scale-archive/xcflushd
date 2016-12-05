@@ -65,7 +65,7 @@ module Xcflushd
       reports(report_keys, suffix)
     end
 
-    def renew_auths(service_id, credentials, authorizations, valid_minutes)
+    def renew_auths(service_id, credentials, authorizations, auth_ttl)
       hash_key = hash_key(:auth, service_id, credentials)
 
       authorizations.each_slice(REDIS_BATCH_KEYS) do |authorizations_slice|
@@ -74,7 +74,7 @@ module Xcflushd
         end
       end
 
-      set_auth_validity(service_id, credentials, valid_minutes)
+      set_auth_validity(service_id, credentials, auth_ttl)
 
     rescue Redis::BaseError
       raise RenewAuthError.new(service_id, credentials)
@@ -205,13 +205,12 @@ module Xcflushd
       end
     end
 
-    def set_auth_validity(service_id, credentials, valid_minutes)
+    def set_auth_validity(service_id, credentials, auth_ttl)
       # Redis does not allow us to set a TTL for hash key fields. TTLs can only
       # be applied to the key containing the hash. This is not a problem
       # because we always renew all the metrics of an application at the same
       # time.
-      storage.expire(hash_key(:auth, service_id, credentials),
-                     valid_minutes * 60)
+      storage.expire(hash_key(:auth, service_id, credentials), auth_ttl)
     end
 
     def increase_usage(report)

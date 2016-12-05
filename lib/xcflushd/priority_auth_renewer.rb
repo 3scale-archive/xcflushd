@@ -27,12 +27,12 @@ module Xcflushd
     # We need two separate Redis clients: one for subscribing to a channel and
     # the other one to publish to different channels. It is specified in the
     # Redis website: http://redis.io/topics/pubsub
-    def initialize(authorizer, storage, redis_pub, redis_sub, auth_valid_min, logger)
+    def initialize(authorizer, storage, redis_pub, redis_sub, auth_ttl, logger)
       @authorizer = authorizer
       @storage = storage
       @redis_pub = redis_pub
       @redis_sub = redis_sub
-      @auth_valid_min = auth_valid_min
+      @auth_ttl = auth_ttl
       @logger = logger
 
       # We can receive several requests to renew the authorization of a
@@ -62,7 +62,7 @@ module Xcflushd
 
     private
 
-    attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_valid_min,
+    attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_ttl,
                 :logger, :current_auths, :thread_pool
 
     def subscribe_to_requests_channel
@@ -142,7 +142,7 @@ module Xcflushd
     end
 
     def renew(service_id, credentials, auths)
-      storage.renew_auths(service_id, credentials, auths, auth_valid_min)
+      storage.renew_auths(service_id, credentials, auths, auth_ttl)
     end
 
     def channel_for_combination(combination)

@@ -14,11 +14,11 @@ module Xcflushd
       return 0, cpus * 4
     end
 
-    def initialize(reporter, authorizer, storage, auth_valid_min, error_handler, threads)
+    def initialize(reporter, authorizer, storage, auth_ttl, error_handler, threads)
       @reporter = reporter
       @authorizer = authorizer
       @storage = storage
-      @auth_valid_min = auth_valid_min
+      @auth_ttl = auth_ttl
       @error_handler = error_handler
 
       min_threads, max_threads = if threads
@@ -50,7 +50,7 @@ module Xcflushd
 
     private
 
-    attr_reader :reporter, :authorizer, :storage, :auth_valid_min,
+    attr_reader :reporter, :authorizer, :storage, :auth_ttl,
                 :error_handler, :thread_pool
 
     def reports
@@ -98,7 +98,7 @@ module Xcflushd
           storage.renew_auths(authorization[:service_id],
                               authorization[:credentials],
                               authorization[:auths],
-                              auth_valid_min)
+                              auth_ttl)
         rescue Storage::RenewAuthError => e
           error_handler.handle_renew_auth_error(e)
         end

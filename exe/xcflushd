@@ -25,10 +25,10 @@ command :run do |c|
   c.desc '3scale provider key'
   c.flag [:k, :'provider-key'], required: true
 
-  c.desc 'Validity of authorizations (in minutes)'
+  c.desc 'Validity of authorizations (in seconds)'
   c.flag [:a, :'auth-ttl'], required: true, type: Integer, must_match: POSITIVE_N_RE
 
-  c.desc 'Reporting frequency (in minutes)'
+  c.desc 'Reporting frequency (in seconds)'
   c.flag [:f, :frequency], required: true, type: Integer, must_match: POSITIVE_N_RE
 
   c.desc 'Thread pool minimum and maximum number of threads (min:max)'
