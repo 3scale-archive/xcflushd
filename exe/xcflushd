@@ -31,8 +31,11 @@ command :run do |c|
   c.desc 'Reporting frequency (in seconds)'
   c.flag [:f, :frequency], required: true, type: Integer, must_match: POSITIVE_N_RE
 
-  c.desc 'Thread pool minimum and maximum number of threads (min:max)'
+  c.desc 'Number of threads for the main thread pool (min:max)'
   c.flag [:t, :threads], default_value: 'auto', type: PositiveMinMaxInt
+
+  c.desc 'Number of threads for the priority auth renewer (min:max)'
+  c.flag [:p, :'prio-threads'], default_value: 'auto', type: PositiveMinMaxInt
 
   c.desc 'Run this program as a background service'
   c.switch :daemonize, default_value: false, negatable: true, multiple: true
@@ -68,9 +71,9 @@ command :run do |c|
       options.delete :t
     end
 
-    if options[:prio_threads] == 'auto'
-      options.delete :threads
-      options.delete 'threads'
+    if options[:'prio-threads'] == 'auto'
+      options.delete :'prio-threads'
+      options.delete :p
     end
 
     banner = "xcflushd [#{Xcflushd::VERSION}]"
