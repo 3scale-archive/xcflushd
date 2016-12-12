@@ -17,11 +17,15 @@ module Xcflushd
     let(:storage) { Storage.new(redis_storage, logger, storage_keys) }
     let(:redis_pub) { Redis.new }
     let(:redis_sub) { Redis.new }
-    let(:auth_valid_min) { 10 }
+    let(:auth_valid_secs) { 10 * 60 }
+    let(:threads) do
+      double('threads', :min => 8, :max => 16)
+    end
 
     subject do
       described_class.new(
-          authorizer, storage, redis_pub, redis_sub, auth_valid_min, logger)
+          authorizer, storage, redis_pub, redis_sub,
+          auth_valid_secs, logger, threads)
     end
 
     let(:auth_requests_channel) { storage_keys::AUTH_REQUESTS_CHANNEL }

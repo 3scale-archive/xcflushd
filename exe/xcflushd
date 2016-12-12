@@ -1,38 +1,10 @@
 #!/usr/bin/env ruby
 require 'gli'
 require 'redis'
-require 'xcflushd/runner'
+require 'xcflushd/gli_helpers'
 
 include GLI::App
-
-OPTIONS = [:'threescale-host',
-           :'threescale-port',
-           :'provider-key',
-           :'redis-host',
-           :'redis-port',
-           :'auth-valid-minutes',
-           :'reporting-freq-minutes',
-           :'daemonize'].freeze
-
-REQUIRED_OPTIONS = (OPTIONS - [:'daemonize']).freeze
-
-def start_xcflusher(options)
-  int_opt_fields = [:'threescale-port', :'redis-port',
-                    :'auth-valid-minutes', :'reporting-freq-minutes']
-  int_opt_fields.each { |opt| options[opt] = options[opt].to_i }
-  Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
-end
-
-# Saves in the options hash those config options present in ENV that have not
-# been specified as command arguments.
-def read_missing_opts_from_env(options)
-  OPTIONS.each do |opt|
-    if options[opt].nil?
-      # ENV vars have "_" instead of "-" and are written in uppercase.
-      options[opt] = ENV[opt.to_s.gsub('-'.freeze, '_'.freeze).upcase]
-    end
-  end
-end
+include Xcflushd::GLIHelpers
 
 program_desc 'XC flush daemon'
 
@@ -41,64 +13,76 @@ version Xcflushd::VERSION
 subcommand_option_handling :normal
 arguments :strict
 
-desc 'Starts the daemon'
-arg_name 'Describe arguments to run here'
+desc 'Starts the XC flusher'
+arg_name ' '
 command :run do |c|
-  c.desc 'Redis host'
-  c.flag :'redis-host'
+  c.desc 'Redis URI'
+  c.flag [:r, :redis], required: true, type: RedisURI
 
-  c.desc 'Redis port'
-  c.flag :'redis-port'
-
-  c.desc '3scale backend host'
-  c.flag :'threescale-host'
-
-  c.desc '3scale backend port'
-  c.flag :'threescale-port'
+  c.desc '3scale backend URI'
+  c.flag [:b, :backend], required: true, type: BackendURI
 
   c.desc '3scale provider key'
-  c.flag :'provider-key'
+  c.flag [:k, :'provider-key'], required: true
 
-  c.desc 'Validity of authorizations (in minutes)'
-  c.flag :'auth-valid-minutes'
+  c.desc 'Validity of authorizations (in seconds)'
+  c.flag [:a, :'auth-ttl'], required: true, type: Integer, must_match: POSITIVE_N_RE
 
-  c.desc 'Reporting frequency (in minutes)'
-  c.flag :'reporting-freq-minutes'
+  c.desc 'Reporting frequency (in seconds)'
+  c.flag [:f, :frequency], required: true, type: Integer, must_match: POSITIVE_N_RE
 
-  c.desc 'Daemonize'
-  c.switch :daemonize
+  c.desc 'Number of threads for the main thread pool (min:max)'
+  c.flag [:t, :threads], default_value: 'auto', type: PositiveMinMaxInt
+
+  c.desc 'Number of threads for the priority auth renewer (min:max)'
+  c.flag [:p, :'prio-threads'], default_value: 'auto', type: PositiveMinMaxInt
+
+  c.desc 'Run this program as a background service'
+  c.switch :daemonize, default_value: false, negatable: true, multiple: true
+
+  c.desc 'Use HTTPS scheme to connect to 3scale backend'
+  c.switch :secure, default_value: true, negatable: true, multiple: true
 
   c.action do |_global_options, options, _args|
     # options contains 2 keys for each option. One is a String and the other a
-    # Symbol. That way we can use options['redis-host'] and
-    # options[:'redis-host']. That's fine as long as we only read from the
-    # hash. If we need to modify it, it is problematic because we need to
-    # remember to modify two values. For simplicity, let's just keep the
-    # elements that have symbols as keys.
+    # Symbol. That way we can use options['redis'] and options[:redis].
+    # That's fine as long as we only read from the hash. If we need to modify
+    # it, it is problematic because we need to remember to modify two values.
+    # For simplicity, let's just keep the elements that have symbols as keys.
     options.keep_if { |k, _v| k.is_a?(Symbol) }
 
-    read_missing_opts_from_env(options)
-
-    REQUIRED_OPTIONS.each do |opt|
-      help_now!("#{opt} is required") unless options[opt]
+    # Reporting frequency should be lower or equal to the authorization TTL.
+    # Otherwise authorizations would be renewed without taking into account the
+    # last available reports. Note: whenever we do reporting we also do renewal
+    # of authorizations; the TTL is important in case of problems renewing
+    # authorizations.
+    if options[:frequency] > options[:'auth-ttl']
+      exit_now!('frequency needs to be <= auth-ttl')
     end
 
-    if options[:'reporting-freq-minutes'].to_i >= options[:'auth-valid-minutes'].to_i
-      exit_now!('reporting-freq-minutes needs to be <= auth-valid-minutes. '\
-                'Otherwise, auths would be renewed without taking into '\
-                'account the new reports.')
+    if (options[:backend].scheme == 'http' && options[:secure]) ||
+        (options[:backend].scheme == 'https' && !options[:secure])
+      exit_now!("the specified backend scheme does not match the --[no-]secure" \
+                " flag.\nCan't continue with conflicting settings.")
     end
+
+    if options[:threads] == 'auto'
+      options.delete :threads
+      options.delete :t
+    end
+
+    if options[:'prio-threads'] == 'auto'
+      options.delete :'prio-threads'
+      options.delete :p
+    end
+
+    banner = "xcflushd [#{Xcflushd::VERSION}]"
 
     if options[:daemonize]
       require 'daemons'
-      begin
-        Daemons.run_proc('xcflush') { start_xcflusher(options) }
-        # When forking, the parent executes 'exit', and GLI thinks that there
-        # has been an error. Let's return the correct exit code.
-      rescue SystemExit => e
-        e.status
-      end
+      Daemons.run_proc(banner) { start_xcflusher(options) }
     else
+      set_title(banner)
       start_xcflusher(options)
     end
   end
@@ -119,10 +103,12 @@ post do |_global, _command, _options, _args|
   # block on that command only
 end
 
-on_error do |_exception|
+on_error do |exception|
   # Error logic here
   # return false to skip default error handling
-  true
+  # When forking, the parent executes 'exit', and GLI error handling kicks in.
+  # Let's just skip it when that's the case.
+  not SystemExit === exception
 end
 
 exit run(ARGV)

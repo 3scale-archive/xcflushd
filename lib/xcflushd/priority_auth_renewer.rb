@@ -1,3 +1,5 @@
+require 'xcflushd/threading'
+
 module Xcflushd
   # Apart from flushing all the cached reports and renewing the authorizations
   # periodically, we need to provide a mechanism to renew a specific auth at
@@ -27,12 +29,13 @@ module Xcflushd
     # We need two separate Redis clients: one for subscribing to a channel and
     # the other one to publish to different channels. It is specified in the
     # Redis website: http://redis.io/topics/pubsub
-    def initialize(authorizer, storage, redis_pub, redis_sub, auth_valid_min, logger)
+    def initialize(authorizer, storage, redis_pub, redis_sub,
+                   auth_ttl, logger, threads)
       @authorizer = authorizer
       @storage = storage
       @redis_pub = redis_pub
       @redis_sub = redis_sub
-      @auth_valid_min = auth_valid_min
+      @auth_ttl = auth_ttl
       @logger = logger
 
       # We can receive several requests to renew the authorization of a
@@ -44,9 +47,15 @@ module Xcflushd
       # ensure thread-safety.
       @current_auths = Concurrent::Map.new
 
-      # TODO: Tune the options of the thread pool
+      min_threads, max_threads = if threads
+                                   [threads.min, threads.max]
+                                 else
+                                   Threading.default_threads_value
+                                 end
+
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
-          max_threads: Concurrent.processor_count * 4)
+        min_threads: min_threads,
+        max_threads: max_threads)
     end
 
     def start
@@ -62,7 +71,7 @@ module Xcflushd
 
     private
 
-    attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_valid_min,
+    attr_reader :authorizer, :storage, :redis_pub, :redis_sub, :auth_ttl,
                 :logger, :current_auths, :thread_pool
 
     def subscribe_to_requests_channel
@@ -142,7 +151,7 @@ module Xcflushd
     end
 
     def renew(service_id, credentials, auths)
-      storage.renew_auths(service_id, credentials, auths, auth_valid_min)
+      storage.renew_auths(service_id, credentials, auths, auth_ttl)
     end
 
     def channel_for_combination(combination)

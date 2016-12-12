@@ -1,4 +1,5 @@
 require 'concurrent'
+require 'xcflushd/threading'
 
 module Xcflushd
   class Flusher
@@ -8,16 +9,21 @@ module Xcflushd
 
     XcflushdError = Class.new(StandardError)
 
-    def initialize(reporter, authorizer, storage, auth_valid_min, error_handler)
+    def initialize(reporter, authorizer, storage, auth_ttl, error_handler, threads)
       @reporter = reporter
       @authorizer = authorizer
       @storage = storage
-      @auth_valid_min = auth_valid_min
+      @auth_ttl = auth_ttl
       @error_handler = error_handler
 
-      # TODO: tune the pool options.
+      min_threads, max_threads = if threads
+                                   [threads.min, threads.max]
+                                 else
+                                   Threading.default_threads_value
+                                 end
+
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
-          max_threads: Concurrent.processor_count * 4)
+        min_threads: min_threads, max_threads: max_threads)
     end
 
     # TODO: decide if we want to renew the authorizations every time.
@@ -39,7 +45,7 @@ module Xcflushd
 
     private
 
-    attr_reader :reporter, :authorizer, :storage, :auth_valid_min,
+    attr_reader :reporter, :authorizer, :storage, :auth_ttl,
                 :error_handler, :thread_pool
 
     def reports
@@ -87,7 +93,7 @@ module Xcflushd
           storage.renew_auths(authorization[:service_id],
                               authorization[:credentials],
                               authorization[:auths],
-                              auth_valid_min)
+                              auth_ttl)
         rescue Storage::RenewAuthError => e
           error_handler.handle_renew_auth_error(e)
         end
