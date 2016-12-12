@@ -1,4 +1,5 @@
 require 'concurrent'
+require 'xcflushd/threading'
 
 module Xcflushd
   class Flusher
@@ -7,12 +8,6 @@ module Xcflushd
     private_constant :WAIT_TIME_REPORT_AUTH
 
     XcflushdError = Class.new(StandardError)
-
-    def self.default_threads_value
-      cpus = Concurrent.processor_count
-      # default thread pool minimum is zero
-      return 0, cpus * 4
-    end
 
     def initialize(reporter, authorizer, storage, auth_ttl, error_handler, threads)
       @reporter = reporter
@@ -24,7 +19,7 @@ module Xcflushd
       min_threads, max_threads = if threads
                                    [threads.min, threads.max]
                                  else
-                                   self.class.default_threads_value
+                                   Threading.default_threads_value
                                  end
 
       @thread_pool = Concurrent::ThreadPoolExecutor.new(
