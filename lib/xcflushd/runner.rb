@@ -31,16 +31,17 @@ module Xcflushd
           host: opts[:redis].host, port: redis_port, driver: :hiredis)
 
         start_priority_auth_renewer(authorizer, storage, redis_pub, redis_sub,
-                                    opts[:auth_ttl], logger)
+                                    opts[:auth_ttl], logger, opts[:prio_threads])
         flush_periodically(flusher, opts[:frequency], logger)
       end
 
       private
 
-      def start_priority_auth_renewer(authorizer, storage, pub, sub, auth_ttl, logger)
+      def start_priority_auth_renewer(authorizer, storage, pub, sub,
+                                      auth_ttl, logger, threads)
         Thread.new do
           PriorityAuthRenewer
-            .new(authorizer, storage, pub, sub, auth_ttl, logger)
+            .new(authorizer, storage, pub, sub, auth_ttl, logger, threads)
             .start
         end
       end
