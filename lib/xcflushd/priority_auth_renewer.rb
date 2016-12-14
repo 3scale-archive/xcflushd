@@ -61,11 +61,10 @@ module Xcflushd
     def start
       begin
         subscribe_to_requests_channel
-      rescue StandardError
-        # If we cannot subscribe, there's no point in running the program.
-        # TODO: Instead of aborting, we should set a flag so the flusher can
-        # exit gracefully. That exit mechanism is not implemented yet.
-        abort('PriorityAuthRenewer cannot subscribe to the requests channel')
+      rescue StandardError => e
+        logger.error("PriorityAuthRenewer can't subscribe to the requests "\
+                     "channel - #{e.class} #{e.message} #{e.cause}")
+        raise e
       end
     end
 
