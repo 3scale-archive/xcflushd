@@ -44,6 +44,18 @@ module Xcflushd
           end
         end
 
+        context 'and 3scale client raises SocketError' do
+          it "raises #{errors[:internal]}" do
+            expect(threescale_client)
+                .to receive(:report)
+                .with(transactions: [transaction], service_id: service_id)
+                .and_raise(SocketError)
+
+            expect { subject.report(service_id, credentials, usage) }
+                .to raise_error errors[:internal]
+          end
+        end
+
         context 'and 3scale client raises ArgumentError' do
           it "raises #{errors[:bad_params]}" do
             expect(threescale_client)
