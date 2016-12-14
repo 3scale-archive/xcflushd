@@ -16,6 +16,18 @@ module Xcflushd
                  internal: described_class::ThreeScaleInternalError,
                  auth: described_class::ThreeScaleAuthError }
 
+      shared_examples 'failed_report' do |exc_to_raise, expected_exc|
+        it "raises #{expected_exc}" do
+          expect(threescale_client)
+              .to receive(:report)
+              .with(transactions: [transaction], service_id: service_id)
+              .and_raise(exc_to_raise)
+
+          expect { subject.report(service_id, credentials, usage) }
+              .to raise_error expected_exc
+        end
+      end
+
       context 'when the report is successful' do
         let(:report_response) do
           Object.new.tap { |o| o.define_singleton_method(:success?) { true } }
@@ -33,39 +45,17 @@ module Xcflushd
 
       context 'when the report fails' do
         context 'and 3scale client raises ServerError' do
-          it "raises #{errors[:internal]}" do
-            expect(threescale_client)
-                .to receive(:report)
-                .with(transactions: [transaction], service_id: service_id)
-                .and_raise(ThreeScale::ServerError.new('error_msg'))
-
-            expect { subject.report(service_id, credentials, usage) }
-                .to raise_error errors[:internal]
-          end
+          include_examples 'failed_report',
+                           ThreeScale::ServerError.new('error_msg'),
+                           errors[:internal]
         end
 
         context 'and 3scale client raises SocketError' do
-          it "raises #{errors[:internal]}" do
-            expect(threescale_client)
-                .to receive(:report)
-                .with(transactions: [transaction], service_id: service_id)
-                .and_raise(SocketError)
-
-            expect { subject.report(service_id, credentials, usage) }
-                .to raise_error errors[:internal]
-          end
+          include_examples 'failed_report', SocketError, errors[:internal]
         end
 
         context 'and 3scale client raises ArgumentError' do
-          it "raises #{errors[:bad_params]}" do
-            expect(threescale_client)
-                .to receive(:report)
-                .with(transactions: [transaction], service_id: service_id)
-                .and_raise(ArgumentError)
-
-            expect { subject.report(service_id, credentials, usage) }
-                .to raise_error errors[:bad_params]
-          end
+          include_examples 'failed_report', ArgumentError, errors[:bad_params]
         end
 
         context 'and 3scale client returns an error in the response' do
