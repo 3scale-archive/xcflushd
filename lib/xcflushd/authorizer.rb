@@ -114,7 +114,8 @@ module Xcflushd
 
     def with_3scale_error_rescue(service_id, credentials)
       yield
-    rescue ThreeScale::ServerError
+    rescue ThreeScale::ServerError, SocketError
+      # We'll get a SocketError if there's a timeout when contacting 3scale.
       raise ThreeScaleInternalError.new(service_id, credentials)
     end
   end
