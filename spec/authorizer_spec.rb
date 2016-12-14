@@ -76,6 +76,20 @@ module Xcflushd
         end
       end
 
+      shared_examples 'error contacting 3scale' do |exc_raised|
+        before do
+          allow(threescale_client)
+              .to receive(:authorize)
+              .with(authorize_args(service_id, credentials.creds))
+              .and_raise(exc_raised)
+        end
+
+        it "raises #{threescale_internal_error}" do
+          expect { subject.authorizations(service_id, credentials, reported_metrics) }
+              .to raise_error threescale_internal_error
+        end
+      end
+
       it 'returns one auth per reported metric' do
         auths = subject.authorizations(service_id, credentials, reported_metrics)
 
@@ -202,17 +216,14 @@ module Xcflushd
         end
       end
 
-      context 'when authorizing against 3scale fails' do
-        before do
-          allow(threescale_client)
-              .to receive(:authorize)
-              .with(authorize_args(service_id, credentials.creds))
-              .and_raise(ThreeScale::ServerError.new('error_msg'))
+      context 'when there is an error while contacting 3scale' do
+        context 'and a ThreeScale::ServerError is raised' do
+          include_examples 'error contacting 3scale',
+                           ThreeScale::ServerError.new('error_msg')
         end
 
-        it "raises #{threescale_internal_error}" do
-          expect { subject.authorizations(service_id, credentials, reported_metrics) }
-              .to raise_error threescale_internal_error
+        context 'and a SocketError is raised' do
+          include_examples 'error contacting 3scale', SocketError
         end
       end
 

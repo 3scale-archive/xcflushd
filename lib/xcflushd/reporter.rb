@@ -22,11 +22,11 @@ module Xcflushd
 
     # Exception raised when the 3scale client is called with the right params
     # but it returns a ServerError. Most of the time this means that 3scale is
-    # down, although it could also be caused by a bug in the 3scale service
-    # management API.
+    # unreachable, although it could also be caused by a bug in the 3scale
+    # service management API.
     class ThreeScaleInternalError < ReporterError
       def initialize(service_id, transaction)
-        super(service_id, transaction, '3scale seems to be down.'.freeze)
+        super(service_id, transaction, '3scale seems to be unreachable.'.freeze)
       end
     end
 
@@ -51,7 +51,8 @@ module Xcflushd
         resp = threescale_client.report(transactions: [transaction],
                                         service_id: service_id)
       # TODO: get rid of the coupling with ThreeScale::ServerError
-      rescue ThreeScale::ServerError
+      rescue ThreeScale::ServerError, SocketError
+        # We'll get a SocketError if there's a timeout when contacting 3scale.
         raise ThreeScaleInternalError.new(service_id, transaction)
       rescue ArgumentError
         raise ThreeScaleBadParams.new(service_id, transaction)

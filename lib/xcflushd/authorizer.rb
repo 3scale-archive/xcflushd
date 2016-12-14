@@ -5,11 +5,11 @@ module Xcflushd
 
     # Exception raised when the 3scale client is called with the right params
     # but it returns a ServerError. Most of the time this means that 3scale is
-    # down.
+    # unreachable.
     class ThreeScaleInternalError < Flusher::XcflushdError
       def initialize(service_id, credentials)
         super("Error renewing auths of service with ID #{service_id} "\
-              "and credentials #{credentials}. 3scale seems to be down")
+              "and credentials #{credentials}. 3scale is unreachable")
       end
     end
 
@@ -114,7 +114,8 @@ module Xcflushd
 
     def with_3scale_error_rescue(service_id, credentials)
       yield
-    rescue ThreeScale::ServerError
+    rescue ThreeScale::ServerError, SocketError
+      # We'll get a SocketError if there's a timeout when contacting 3scale.
       raise ThreeScaleInternalError.new(service_id, credentials)
     end
   end
