@@ -26,6 +26,18 @@ module Xcflushd
         min_threads: min_threads, max_threads: max_threads)
     end
 
+    def shutdown
+      @thread_pool.shutdown
+    end
+
+    def wait_for_termination(secs = nil)
+      @thread_pool.wait_for_termination(secs)
+    end
+
+    def terminate
+      @thread_pool.kill
+    end
+
     # TODO: decide if we want to renew the authorizations every time.
     def flush
       reports_to_flush = reports

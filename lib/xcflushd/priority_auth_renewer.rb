@@ -58,6 +58,18 @@ module Xcflushd
         max_threads: max_threads)
     end
 
+    def shutdown
+      @thread_pool.shutdown
+    end
+
+    def wait_for_termination(secs = nil)
+      @thread_pool.wait_for_termination(secs)
+    end
+
+    def terminate
+      @thread_pool.kill
+    end
+
     def start
       begin
         subscribe_to_requests_channel
