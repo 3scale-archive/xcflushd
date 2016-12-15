@@ -153,10 +153,14 @@ module Xcflushd
         allow(subject).to receive(:subscribe_to_requests_channel).and_raise
       end
 
-      it 'aborts' do
+      it 'raises a manageable error (keeps running)' do
         expect { subject.start }
-            .to raise_exception(SystemExit)
-            .and output.to_stderr # Do not show the msg when running the tests
+            .to raise_exception(StandardError)
+      end
+
+      it 'logs an error' do
+        subject.start rescue nil
+        expect(logger).to have_received(:error)
       end
     end
 
