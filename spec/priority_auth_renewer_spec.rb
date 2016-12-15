@@ -12,7 +12,7 @@ module Xcflushd
   describe PriorityAuthRenewer do
     let(:authorizer) { double('authorizer') }
     let(:redis_storage) { Redis.new }
-    let(:logger) { double('logger', warn: true, error: true) }
+    let(:logger) { double('logger', warn: true, error: true, info: true) }
     let(:storage_keys) { StorageKeys }
     let(:storage) { Storage.new(redis_storage, logger, storage_keys) }
     let(:redis_pub) { Redis.new }

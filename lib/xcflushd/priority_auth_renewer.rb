@@ -87,6 +87,10 @@ module Xcflushd
 
     def subscribe_to_requests_channel
       redis_sub.subscribe(StorageKeys::AUTH_REQUESTS_CHANNEL) do |on|
+        on.subscribe do |channel, _subscriptions|
+          logger.info("PriorityAuthRenewer correctly subscribed to #{channel}")
+        end
+
         on.message do |_channel, msg|
           begin
             # The renew and publish operations need to be done asynchronously.
