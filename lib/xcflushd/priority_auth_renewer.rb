@@ -58,14 +58,25 @@ module Xcflushd
         max_threads: max_threads)
     end
 
+    def shutdown
+      @thread_pool.shutdown
+    end
+
+    def wait_for_termination(secs = nil)
+      @thread_pool.wait_for_termination(secs)
+    end
+
+    def terminate
+      @thread_pool.kill
+    end
+
     def start
       begin
         subscribe_to_requests_channel
-      rescue StandardError
-        # If we cannot subscribe, there's no point in running the program.
-        # TODO: Instead of aborting, we should set a flag so the flusher can
-        # exit gracefully. That exit mechanism is not implemented yet.
-        abort('PriorityAuthRenewer cannot subscribe to the requests channel')
+      rescue StandardError => e
+        logger.error("PriorityAuthRenewer can't subscribe to the requests "\
+                     "channel - #{e.class} #{e.message} #{e.cause}")
+        raise e
       end
     end
 
@@ -76,6 +87,10 @@ module Xcflushd
 
     def subscribe_to_requests_channel
       redis_sub.subscribe(StorageKeys::AUTH_REQUESTS_CHANNEL) do |on|
+        on.subscribe do |channel, _subscriptions|
+          logger.info("PriorityAuthRenewer correctly subscribed to #{channel}")
+        end
+
         on.message do |_channel, msg|
           begin
             # The renew and publish operations need to be done asynchronously.
@@ -85,6 +100,15 @@ module Xcflushd
             # messages received in the channel concurrently.
             unless currently_authorizing?(msg)
               async_renew_and_publish_task(msg).execute
+            end
+          rescue Concurrent::RejectedExecutionError => e
+            # This error is raised when we try to submit a task to the thread
+            # pool and it is rejected.
+            # After we call shutdown() on the thread pool, this error will be
+            # raised. We do not want to log errors in this case.
+            unless thread_pool.shuttingdown?
+              logger.error('Error while treating a message received in the '\
+                           "requests channel: #{e.message}")
             end
           rescue StandardError => e
             # If we do not rescue from an exception raised while treating a

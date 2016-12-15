@@ -62,7 +62,12 @@ module Xcflushd
       suffix = suffix_for_unique_naming
 
       report_keys = report_keys_to_flush(suffix)
-      reports(report_keys, suffix)
+      if report_keys.empty?
+        logger.warn "No reports available to flush"
+        report_keys
+      else
+        reports(report_keys, suffix)
+      end
     end
 
     def renew_auths(service_id, credentials, authorizations, auth_ttl)
