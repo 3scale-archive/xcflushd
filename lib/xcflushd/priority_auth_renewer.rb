@@ -97,6 +97,15 @@ module Xcflushd
             unless currently_authorizing?(msg)
               async_renew_and_publish_task(msg).execute
             end
+          rescue Concurrent::RejectedExecutionError => e
+            # This error is raised when we try to submit a task to the thread
+            # pool and it is rejected.
+            # After we call shutdown() on the thread pool, this error will be
+            # raised. We do not want to log errors in this case.
+            unless thread_pool.shuttingdown?
+              logger.error('Error while treating a message received in the '\
+                           "requests channel: #{e.message}")
+            end
           rescue StandardError => e
             # If we do not rescue from an exception raised while treating a
             # message, the redis client instance used stops receiving messages.
