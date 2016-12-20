@@ -99,7 +99,7 @@ Every X minutes (configurable) the flusher does two things:
    applications affected by the cached reports that have been reported to
    3scale.
 
-A detailed design document will be provided later.
+For more details, check the [design doc](docs/design.md).
 
 
 ## Contributing
