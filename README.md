@@ -1,5 +1,7 @@
 # Xcflushd
 
+[![Build Status](https://travis-ci.org/3scale/xcflushd.svg?branch=master)](https://travis-ci.org/3scale/xcflushd)
+
 ## Description
 
 This is the daemon that flushes the data that the gateway side of XC like the
