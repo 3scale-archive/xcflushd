@@ -10,7 +10,11 @@ Gem::Specification.new do |spec|
   spec.email         = ["support@3scale.net"]
 
   spec.summary       = %q{Daemon for flushing XC reports to 3scale.}
-  spec.description   = %q{Daemon for flushing XC reports to 3scale.}
+  spec.description   = "xcflushd is a daemon that connects to a Redis database " \
+                       "containing 3scale's XC API Management data and flushes " \
+                       "it to the 3scale service for cached reporting and " \
+                       "authorizations. Check https://github.com/3scale/apicast-xc" \
+                       " for an implementation of a 3scale's XC gateway."
   spec.homepage      = "https://github.com/3scale/xcflushd"
 
   spec.license       = "Apache-2.0"
