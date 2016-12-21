@@ -1,5 +1,7 @@
 # Xcflushd
 
+[![Build Status](https://travis-ci.org/3scale/xcflushd.svg?branch=master)](https://travis-ci.org/3scale/xcflushd) [![Code Climate](https://codeclimate.com/repos/585a6e7cd78de855e5002463/badges/7825d2a1491b30a172f7/gpa.svg)](https://codeclimate.com/repos/585a6e7cd78de855e5002463/feed)
+
 ## Description
 
 This is the daemon that flushes the data that the gateway side of XC like the
