@@ -1,0 +1,31 @@
+---
+engines:
+  bundler-audit:
+    enabled: true
+  duplication:
+    enabled: true
+    config:
+      languages:
+      - ruby
+  fixme:
+    enabled: true
+  rubocop:
+    enabled: true
+    exclude_fingerprints:
+      - e573bf4e82d49fe8d16722fc5fd3c6de
+      - cbaeffb7e01fb84f99e37993344635db
+      - dee175361c2218eb94439d9ea91bbc10
+      - f245d8a4e95bc5447c00a8e19d669f5e
+ratings:
+  paths:
+  - Gemfile.lock
+  - "**.inc"
+  - "**.js"
+  - "**.jsx"
+  - "**.module"
+  - "**.php"
+  - "**.py"
+  - "**.rb"
+exclude_paths:
+- script/
+- spec/

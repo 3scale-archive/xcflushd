@@ -69,7 +69,7 @@ module Xcflushd
     end
 
     def start_xcflusher(options)
-      Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.gsub('-', '_').to_sym, v] }])
+      Xcflushd::Runner.run(Hash[options.map { |k, v| [k.to_s.tr('-', '_').to_sym, v] }])
     end
 
     def set_title(title)
