@@ -105,7 +105,7 @@ module Xcflushd
       private
 
       def hash_key(type, service_id, creds)
-        "#{type.to_s},service_id:#{service_id},#{creds.to_sorted_escaped_s}"
+        "#{type},service_id:#{service_id},#{creds.to_sorted_escaped_s}"
       end
 
     end
