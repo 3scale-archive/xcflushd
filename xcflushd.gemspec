@@ -22,15 +22,15 @@ Gem::Specification.new do |spec|
 
   spec.required_ruby_version = '>= 2.1.0'
 
-  spec.add_runtime_dependency "3scale_client", "~> 2.10.0"
+  spec.add_runtime_dependency "3scale_client", "~> 2.10"
   spec.add_runtime_dependency "gli", "= 2.14.0"
-  spec.add_runtime_dependency "redis", "= 3.3.1"
+  spec.add_runtime_dependency "redis", "= 3.3.2"
   spec.add_runtime_dependency "hiredis", "= 0.6.1"
   spec.add_runtime_dependency "concurrent-ruby", "1.0.2"
   spec.add_runtime_dependency "net-http-persistent", "2.9.4"
   spec.add_runtime_dependency "daemons", "= 1.2.4"
 
-  spec.add_development_dependency "bundler", "~> 1.12"
+  spec.add_development_dependency "bundler", "~> 1.13"
   spec.add_development_dependency "rake", "~> 11.0"
   spec.add_development_dependency "rspec", "~> 3.0"
   spec.add_development_dependency "fakeredis", "~> 0.6.0"
