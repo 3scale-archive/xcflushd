@@ -5,7 +5,7 @@
 ## Description
 
 This is the daemon that flushes the data that the gateway side of XC like the
-[apicast-xc](https://github.com/3scale/apicast-xc) module running on top of [Apicast](https://github.com/3scale/apicast), stores for reporting and authorizing to 3scale.
+[apicast-xc](https://github.com/3scale/apicast-xc) module running on top of [APIcast](https://github.com/3scale/apicast), stores for reporting and authorizing to 3scale.
 
 When you deploy 3scale to a gateway you usually have a request performed to
 3scale for every request that needs authorization, which introduces latency and
@@ -88,7 +88,7 @@ $ bundle exec xcflushd help
 
 ### Openshift
 
-If what you need is deploying Xcflushd together with Apicast and XC, you can
+If what you need is deploying Xcflushd together with APIcast and XC, you can
 follow the instructions provided in the [apicast-xc repo](https://github.com/3scale/apicast-xc).
 
 
