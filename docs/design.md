@@ -3,7 +3,7 @@
 ## Description
 
 xcflushd is a daemon used together with [XC](https://github.com/3scale/apicast-xc),
-which is a module for [Apicast](https://github.com/3scale/apicast), 3scale's
+which is a module for [APIcast](https://github.com/3scale/apicast), 3scale's
 API Gateway.
 
 If you are not familiar with XC yet, we recommend you to start reading its
@@ -61,7 +61,7 @@ in the reports sent to 3scale's backend, and 2) do not have any limits defined.
 The whole flushing process makes 2 calls to 3scale per application reported.
 One call to send the report to 3scale, and another one to get the current
 authorization status. Compare that to making one request for each one that
-arrives to the proxy as in the case of Apicast. Imagine that you have 1k rps,
+arrives to the proxy as in the case of APIcast. Imagine that you have 1k rps,
 and 100 apps. If you define a period of 1 minute for the flushing process, you
 will be making 200 requests to 3scale's backend per minute instead of 60k.
 
