@@ -68,7 +68,7 @@ $ docker run --rm xcflushd bundle exec xcflushd help run
 
 You can send the options as params in the `xcflushd` command:
 ```
-$ docker run --rm xcflushd bundle exec xcflushd run --auth-ttl 900 --provider-key my_provider_key --redis 127.0.0.1:6379 --frequency 300 --backend https://su1.3scale.net:443
+$ docker run --rm -it xcflushd bundle exec xcflushd run --auth-ttl 900 --provider-key my_provider_key --redis 127.0.0.1:6379 --frequency 300 --backend https://su1.3scale.net:443
 ```
 
 Please note that the help command will also show you abbreviated flags you can
