@@ -137,9 +137,6 @@ module Xcflushd
 
     describe '.service_and_creds' do
       let(:service_id) { 'a_service_id' }
-      let(:credentials) do
-        Credentials.new(user_key: 'a,user:key') # ':' and ',' need to be escaped
-      end
       let(:suffix) { 'a_suffix' }
 
       # Based on the 3 lets defined above
@@ -151,9 +148,26 @@ module Xcflushd
             suffix
       end
 
-      it 'returns an array with the service ID and credentials encoded in the key' do
-        expect(subject.service_and_creds(encoded_key, suffix))
-            .to eq [service_id, credentials]
+      context 'when the key contains just one credential' do
+        let(:credentials) do
+          Credentials.new(user_key: 'a,user:key') # ':' and ',' need to be escaped
+        end
+
+        it 'returns an array with the service ID and credentials encoded in the key' do
+          expect(subject.service_and_creds(encoded_key, suffix))
+              .to eq [service_id, credentials]
+        end
+      end
+
+      context 'when the key contains several credentials' do
+        let(:credentials) do
+          Credentials.new(app_id: 'an,app:id', app_key: 'a_key')
+        end
+
+        it 'returns an array with the service ID and credentials encoded in the key' do
+          expect(subject.service_and_creds(encoded_key, suffix))
+              .to eq [service_id, credentials]
+        end
       end
     end
 

@@ -80,10 +80,12 @@ module Xcflushd
       # Returns an array of size 2 with a service and the credentials encoded
       # given a key marked as 'to be flushed' and its suffix.
       def service_and_creds(key_to_flush, suffix)
-        escaped_service, escaped_creds =
-            key_to_flush.sub("#{KEY_TO_FLUSH_PREFIX}#{REPORT_KEY_PREFIX}", '')
-                        .sub(suffix, '')
-                        .split(/(?<!\\),/)
+        split_key = key_to_flush.sub("#{KEY_TO_FLUSH_PREFIX}#{REPORT_KEY_PREFIX}", '')
+                                .sub(suffix, '')
+                                .split(/(?<!\\),/)
+
+        escaped_service = split_key.first
+        escaped_creds = split_key[1..-1].join(','.freeze)
 
         # escaped_service is a string with 'service_id:' followed by the escaped
         # service ID. escaped_creds starts with 'credentials:' and is followed
