@@ -1,7 +1,7 @@
 PATH
   remote: .
   specs:
-    xcflushd (1.0.0.rc2)
+    xcflushd (1.0.0.rc3)
       3scale_client (~> 2.10)
       concurrent-ruby (= 1.0.2)
       daemons (= 1.2.4)
