@@ -97,6 +97,8 @@ module Xcflushd
           end
         end
         @logger.info('Exiting')
+      rescue SignalException => e
+        @logger.fatal("Received unhandled signal #{e.cause}, shutting down")
       rescue Exception => e
         @logger.fatal("Unhandled exception #{e.class}, shutting down: #{e.cause} - #{e}")
       ensure
