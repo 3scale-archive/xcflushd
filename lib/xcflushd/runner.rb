@@ -97,6 +97,8 @@ module Xcflushd
           end
         end
         @logger.info('Exiting')
+      rescue SignalException => e
+        @logger.fatal("Received unhandled signal #{e.cause}, shutting down")
       rescue Exception => e
         @logger.fatal("Unhandled exception #{e.class}, shutting down: #{e.cause} - #{e}")
       ensure
@@ -157,8 +159,12 @@ module Xcflushd
 
       def setup_sighandlers
         @exit = false
-        Signal.trap('EXIT') { @exit = true }
-        Signal.trap('INT') { @exit = true }
+        ['HUP', 'USR1', 'USR2'].each do |sig|
+          Signal.trap(sig, "SIG_IGN")
+        end
+        ['EXIT', 'TERM', 'INT'].each do |sig|
+          Signal.trap(sig) { @exit = true }
+        end
       end
     end
   end
