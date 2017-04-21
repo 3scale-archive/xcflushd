@@ -14,4 +14,4 @@ test: build
 	docker run --rm -t xcflushd script/test
 
 bash: build
-	docker run --rm -t -i -v $(PROJECT_PATH):$(DOCKER_PROJECT_PATH) xcflushd /bin/bash
+	docker run --rm -t -i -v $(PROJECT_PATH):$(DOCKER_PROJECT_PATH):z xcflushd /bin/bash
