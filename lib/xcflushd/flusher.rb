@@ -9,12 +9,13 @@ module Xcflushd
 
     XcflushdError = Class.new(StandardError)
 
-    def initialize(reporter, authorizer, storage, auth_ttl, error_handler, threads)
+    def initialize(reporter, authorizer, storage, auth_ttl, error_handler, logger, threads)
       @reporter = reporter
       @authorizer = authorizer
       @storage = storage
       @auth_ttl = auth_ttl
       @error_handler = error_handler
+      @logger = logger
 
       min_threads, max_threads = if threads
                                    [threads.min, threads.max]
@@ -40,8 +41,11 @@ module Xcflushd
 
     # TODO: decide if we want to renew the authorizations every time.
     def flush
-      reports_to_flush = reports
-      report(reports_to_flush)
+      reports_to_flush = run_and_log_time('Getting the reports from Redis') do
+        reports
+      end
+
+      run_and_log_time('Reporting to 3scale') { report(reports_to_flush) }
 
       # Ideally, we would like to ensure that once we start checking
       # authorizations, they have taken into account the reports that we just
@@ -52,13 +56,17 @@ module Xcflushd
       # problem.
       sleep(WAIT_TIME_REPORT_AUTH)
 
-      renew(authorizations(reports_to_flush))
+      auths = run_and_log_time('Getting the auths from 3scale') do
+        authorizations(reports_to_flush)
+      end
+
+      run_and_log_time('Renewing the auths in Redis') { renew(auths) }
     end
 
     private
 
     attr_reader :reporter, :authorizer, :storage, :auth_ttl,
-                :error_handler, :thread_pool
+                :error_handler, :logger, :thread_pool
 
     def reports
       storage.reports_to_flush
@@ -142,5 +150,11 @@ module Xcflushd
       end.to_h
     end
 
+    def run_and_log_time(action, &blk)
+      t = Time.now
+      res = blk.call
+      logger.debug("#{action} took #{(Time.now - t).round(3)} seconds")
+      res
+    end
   end
 end

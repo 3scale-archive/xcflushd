@@ -19,13 +19,15 @@ module Xcflushd
              :handle_renew_auth_error => true)
     end
 
+    let(:logger) { double('logger', debug: true) }
+
     let(:threads) do
       double('threads', :min => 8, :max => 16)
     end
 
     subject do
       described_class.new(reporter, authorizer, storage, auth_valid_secs,
-                          error_handler, threads)
+                          error_handler, logger, threads)
     end
 
     before do
