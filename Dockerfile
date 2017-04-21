@@ -15,7 +15,7 @@ RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache \
  && rm -f /etc/cron.daily/apt \
  && rm -f /etc/cron.daily/dpkg \
  && rm -f /etc/cron.daily/passwd \
- && apt-get update -y -q && apt-get install -y -q apt-utils \
+ && apt-get update -y -q && apt-get install -y -q apt-utils tzdata \
  && apt-get dist-upgrade -y -q \
  && apt-get install -y -q sudo cron logrotate wget curl unzip ca-certificates \
     iputils-arping inetutils-ping inetutils-telnet net-tools nmap iotop tmux vim \
