@@ -368,7 +368,7 @@ module Xcflushd
 
       context 'when there is an error' do
         # Fake redis error in any method that the client receives.
-        before { allow(redis).to receive(:hset).and_raise(Redis::BaseError) }
+        before { allow(redis).to receive(:hmset).and_raise(Redis::BaseError) }
 
         it "raises a #{renew_auth_error}" do
           expect { subject.renew_auths(service_id, credentials, authorizations, valid_secs) }

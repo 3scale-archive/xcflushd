@@ -74,9 +74,15 @@ module Xcflushd
       hash_key = hash_key(:auth, service_id, credentials)
 
       authorizations.each_slice(REDIS_BATCH_KEYS) do |authorizations_slice|
+        # Array with the hash key and all the sorted key-values
+        hmset_args = [hash_key]
+
         authorizations_slice.each do |metric, auth|
-          storage.hset(hash_key, metric, auth_value(auth))
+          hmset_args << metric
+          hmset_args << auth_value(auth)
         end
+
+        storage.hmset(*hmset_args)
       end
 
       set_auth_validity(service_id, credentials, auth_ttl)
