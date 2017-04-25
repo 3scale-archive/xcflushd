@@ -46,7 +46,7 @@ module Xcflushd
 
         error_handler = FlusherErrorHandler.new(@logger, storage)
         @flusher = Flusher.new(reporter, authorizer, storage,
-                               auth_ttl, error_handler, opts[:threads])
+                               auth_ttl, error_handler, @logger, opts[:threads])
 
         @prio_auth_renewer = PriorityAuthRenewer.new(authorizer, storage,
                                                      redis_pub, redis_sub,
