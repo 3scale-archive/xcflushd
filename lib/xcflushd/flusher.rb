@@ -54,7 +54,9 @@ module Xcflushd
       # processed.
       # For now, let's just wait a few seconds. This will greatly mitigate the
       # problem.
-      sleep(WAIT_TIME_REPORT_AUTH)
+      run_and_log_time('Giving reports some time to be processed') do
+        sleep(WAIT_TIME_REPORT_AUTH)
+      end
 
       auths = run_and_log_time('Getting the auths from 3scale') do
         authorizations(reports_to_flush)
