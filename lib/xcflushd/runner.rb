@@ -2,6 +2,7 @@ require 'xcflushd'
 require 'redis'
 require '3scale_client'
 require 'xcflushd/3scale_client_ext'
+require 'xcflushd/threading'
 
 module Xcflushd
   class Runner
@@ -46,12 +47,13 @@ module Xcflushd
 
         error_handler = FlusherErrorHandler.new(@logger, storage)
         @flusher = Flusher.new(reporter, authorizer, storage,
-                               auth_ttl, error_handler, @logger, opts[:threads])
+                               auth_ttl, error_handler, @logger,
+                               flusher_threads(opts[:threads]))
 
         @prio_auth_renewer = PriorityAuthRenewer.new(authorizer, storage,
                                                      redis_pub, redis_sub,
                                                      auth_ttl, @logger,
-                                                     opts[:prio_threads])
+                                                     prio_threads(opts[:prio_threads]))
 
         @prio_auth_renewer_thread = start_priority_auth_renewer
 
@@ -59,6 +61,14 @@ module Xcflushd
       end
 
       private
+
+      def flusher_threads(opts_threads)
+        opts_threads ? opts_threads.max : Threading.default_threads
+      end
+
+      def prio_threads(opts_prio_threads)
+        opts_prio_threads ? opts_prio_threads.max : Threading.default_threads
+      end
 
       def start_priority_auth_renewer
         Thread.new do
