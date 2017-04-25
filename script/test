@@ -4,6 +4,12 @@ SCRIPT_DIR=$(dirname "$(readlink -f $0)")
 
 pushd ${SCRIPT_DIR} > /dev/null
 export TEST_COVERAGE=1
+
+# 'debug' is needed for test coverage, 'dev' makes the JVM boot fast at the
+# expense of long-running code performance among other things recommended for
+# development: https://github.com/jruby/jruby/wiki/Improving-startup-time
+export JRUBY_OPTS="--debug --dev"
+
 bundle exec rake spec
 STATUS=$?
 popd > /dev/null
