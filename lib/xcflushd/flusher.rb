@@ -1,5 +1,4 @@
 require 'concurrent'
-require 'xcflushd/threading'
 
 module Xcflushd
   class Flusher
@@ -16,15 +15,7 @@ module Xcflushd
       @auth_ttl = auth_ttl
       @error_handler = error_handler
       @logger = logger
-
-      min_threads, max_threads = if threads
-                                   [threads.min, threads.max]
-                                 else
-                                   Threading.default_threads_value
-                                 end
-
-      @thread_pool = Concurrent::ThreadPoolExecutor.new(
-        min_threads: min_threads, max_threads: max_threads)
+      @thread_pool = Concurrent::FixedThreadPool.new(threads)
     end
 
     def shutdown

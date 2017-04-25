@@ -18,9 +18,7 @@ module Xcflushd
     let(:redis_pub) { Redis.new }
     let(:redis_sub) { Redis.new }
     let(:auth_valid_secs) { 10 * 60 }
-    let(:threads) do
-      double('threads', :min => 8, :max => 16)
-    end
+    let(:threads) { 8 }
 
     subject do
       described_class.new(
