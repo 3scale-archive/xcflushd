@@ -31,10 +31,12 @@ command :run do |c|
   c.desc 'Reporting frequency (in seconds)'
   c.flag [:f, :frequency], required: true, type: Integer, must_match: POSITIVE_N_RE
 
-  c.desc 'Number of threads for the main thread pool (min:max)'
+  c.desc 'Number of threads for the main thread pool (min:max). '\
+         'min is not used, it is there just for backwards compatibility.'
   c.flag [:t, :threads], default_value: 'auto', type: PositiveMinMaxInt
 
-  c.desc 'Number of threads for the priority auth renewer (min:max)'
+  c.desc 'Number of threads for the priority auth renewer (min:max). '\
+         'min is not used, it is there just for backwards compatibility.'
   c.flag [:p, :'prio-threads'], default_value: 'auto', type: PositiveMinMaxInt
 
   c.desc 'Run this program as a background service'
