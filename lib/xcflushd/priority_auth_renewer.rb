@@ -1,5 +1,3 @@
-require 'xcflushd/threading'
-
 module Xcflushd
   # Apart from flushing all the cached reports and renewing the authorizations
   # periodically, we need to provide a mechanism to renew a specific auth at
@@ -47,15 +45,7 @@ module Xcflushd
       # ensure thread-safety.
       @current_auths = Concurrent::Map.new
 
-      min_threads, max_threads = if threads
-                                   [threads.min, threads.max]
-                                 else
-                                   Threading.default_threads_value
-                                 end
-
-      @thread_pool = Concurrent::ThreadPoolExecutor.new(
-        min_threads: min_threads,
-        max_threads: max_threads)
+      @thread_pool = Concurrent::FixedThreadPool.new(threads)
     end
 
     def shutdown

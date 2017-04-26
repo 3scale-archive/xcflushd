@@ -3,10 +3,8 @@ require 'concurrent'
 
 module Xcflushd
   module Threading
-    def self.default_threads_value
-      cpus = Concurrent.processor_count
-      # default thread pool minimum is zero
-      return 0, cpus * 4
+    def self.default_threads
+      Concurrent.processor_count * 4
     end
   end
 end

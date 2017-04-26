@@ -20,10 +20,7 @@ module Xcflushd
     end
 
     let(:logger) { double('logger', debug: true) }
-
-    let(:threads) do
-      double('threads', :min => 8, :max => 16)
-    end
+    let(:threads) { 8 }
 
     subject do
       described_class.new(reporter, authorizer, storage, auth_valid_secs,
