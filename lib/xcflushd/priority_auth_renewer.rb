@@ -20,9 +20,8 @@ module Xcflushd
   #      status once it gets it from 3scale.
   class PriorityAuthRenewer
 
-    # Number of times that a response is published
-    TIMES_TO_PUBLISH = 5
-    private_constant :TIMES_TO_PUBLISH
+    PUBLISH_WAIT_TIMES = [0.002, 0.005, 0.005, 0.01, 0.015].freeze
+    private_constant :PUBLISH_WAIT_TIMES
 
     # We need two separate Redis clients: one for subscribing to a channel and
     # the other one to publish to different channels. It is specified in the
@@ -191,16 +190,18 @@ module Xcflushd
       # between the moment the requests performs the publish and the
       # subscribe actions. To mitigate the problem we can publish several
       # times during some ms. We will see if this is good enough.
-      # Trade-off: publishing too much increases the Redis load. Waiting too
-      # much makes the incoming request slow.
+      # Trade-off: Waiting long times between publishing attempts reduces the
+      # probability of triggering the problem described. However, it also makes
+      # incoming requests slow because tasks accumulate in the thread pool
+      # waiting.
       publish_failures = 0
-      TIMES_TO_PUBLISH.times do |t|
+      PUBLISH_WAIT_TIMES.each do |wait_time|
         begin
           publish_auth(combination, authorization)
         rescue
           publish_failures += 1
         end
-        sleep((1.0/50)*((t+1)**2))
+        sleep(wait_time)
       end
 
       if publish_failures > 0
