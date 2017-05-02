@@ -33,6 +33,8 @@ RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache \
  && chown -R ${USER_NAME}: ${USER_HOME} \
  && apt-get -y -q clean
 
+RUN apt-get install -y -q openjdk-8-jre
+
 USER ${USER_NAME}
 
 ARG RBENV_ROOT="${USER_HOME}/.rbenv"
@@ -96,4 +98,5 @@ RUN chown -R ${USER_NAME}: ${APP_HOME}
 USER ${USER_NAME}
 RUN bundle install
 
-CMD bundle exec exe/xcflushd run
+ARG JRUBY_EXEC="jruby -Xcompile.invokedynamic=true -J-XX:ReservedCodeCacheSize=256M -J-XX:+UseCodeCacheFlushing -J-Xmn512m -J-Xms2048m -J-Xmx2048m -J-server -J-Djruby.objectspace.enabled=false -J-Djruby.thread.pool.enabled=true -J-Djruby.thread.pool.ttl=600 -J-Djruby.compile.mode=FORCE --server --headless -S"
+CMD ${JRUBY_EXEC} bundle exec exe/xcflushd run

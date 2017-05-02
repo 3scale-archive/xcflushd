@@ -28,7 +28,9 @@ module Xcflushd
 
         redis_host = opts[:redis].host
         redis_port = opts[:redis].port
-        redis = Redis.new(host: redis_host, port: redis_port, driver: :hiredis)
+        redis_driver = RUBY_ENGINE == 'jruby' ? :ruby : :hiredis
+
+        redis = Redis.new(host: redis_host, port: redis_port, driver: redis_driver)
         storage = Storage.new(redis, @logger, StorageKeys)
 
         threescale = ThreeScale::Client.new(provider_key: opts[:provider_key],
@@ -40,8 +42,8 @@ module Xcflushd
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)
 
-        redis_pub = Redis.new(host: redis_host, port: redis_port, driver: :hiredis)
-        redis_sub = Redis.new(host: redis_host, port: redis_port, driver: :hiredis)
+        redis_pub = Redis.new(host: redis_host, port: redis_port, driver: redis_driver)
+        redis_sub = Redis.new(host: redis_host, port: redis_port, driver: redis_driver)
 
         auth_ttl = opts[:auth_ttl]
 

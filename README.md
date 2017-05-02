@@ -63,27 +63,35 @@ $ make build
 
 Run:
 ```
-$ docker run --rm xcflushd bundle exec xcflushd help run
+$ docker run --rm -it xcflushd script/launch help
 ```
 
-You can send the options as params in the `xcflushd` command:
+You can send the options as params for `script/launch`:
 ```
-$ docker run --rm -it xcflushd bundle exec xcflushd run --auth-ttl 900 --provider-key my_provider_key --redis 127.0.0.1:6379 --frequency 300 --backend https://su1.3scale.net:443
+$ docker run --rm -it xcflushd script/launch run --auth-ttl 900 --provider-key my_provider_key --redis 127.0.0.1:6379 --frequency 300 --backend https://su1.3scale.net:443
 ```
 
 Please note that the help command will also show you abbreviated flags you can
-use at your convenience.
+use at your convenience. Also, `script/launch` sets all the JRuby flags
+recommended for a production environment. If you'd like to set different ones,
+you can run:
+```
+$ docker run --rm -it xcflushd JRUBY_OPTS="..." jruby -S bundle exec xcflushd help
+```
 
 ### Locally
 
+This instructions are for JRuby, the Ruby implementation that we recommend for
+running xcflushd.
+
 Install the dependencies:
 ```
-$ bundle install
+$ jruby -S bundle install
 ```
 
-Run the program:
+Run the program with the recommended flags for production:
 ```
-$ bundle exec xcflushd help
+$ script/launch help
 ```
 
 ### Openshift
