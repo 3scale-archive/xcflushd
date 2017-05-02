@@ -7,7 +7,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ARG USER_NAME=user
 ARG USER_HOME="/home/${USER_NAME}"
 # Timezone
-ARG TZ="Europe/Madrid"
+ARG TZ="UTC"
 
 RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache \
  && echo 'APT {Install-Recommends="false";Install-Suggests="false";};' > /etc/apt/apt.conf.d/no-recommends \
