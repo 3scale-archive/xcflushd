@@ -155,8 +155,11 @@ module Xcflushd
           logger.error(SOME_REPORTS_MISSING_ERROR)
         else
           keys.each_with_index do |key, i|
-            # The usage could be empty if we failed to rename the key in the
-            # previous step. hgetall returns {} for keys that do not exist.
+            # hgetall returns {} for keys that do not exist. That can happen
+            # for 2 reasons:
+            # 1) Apicast-xc does not guarantee that a key in the set of cached
+            # reports will always exist.
+            # 2) We failed to rename the key in the previous step.
             unless usages[i].empty?
               service_id, creds = storage_keys.service_and_creds(key, suffix)
               result << { service_id: service_id,
