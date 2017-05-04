@@ -33,12 +33,18 @@ module Xcflushd
         redis = Redis.new(host: redis_host, port: redis_port, driver: redis_driver)
         storage = Storage.new(redis, @logger, StorageKeys)
 
+        # The 3scale client shows a warning when using provider keys, because
+        # they are deprecated in favor of service tokens. However, we need to
+        # continue using provider keys, so we set warn_deprecated to false to
+        # avoid generating unnecessary warnings.
         threescale = ThreeScale::Client.new(provider_key: opts[:provider_key],
                                             host: opts[:backend].host,
                                             port: opts[:backend].port ||
                                               (opts[:secure] ? 443 : 80),
                                             secure: opts[:secure],
-                                            persistent: true)
+                                            persistent: true,
+                                            warn_deprecated: false)
+
         reporter = Reporter.new(threescale)
         authorizer = Authorizer.new(threescale)
 
