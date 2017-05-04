@@ -120,6 +120,51 @@ module Xcflushd
         end
       end
 
+      # A report in apicast-xc consists of one hincrby (increases the usage)
+      # and one sadd (adds the hash key to the set of cached reports). For
+      # performance reasons, those 2 commands are not executed atomically.
+      # We might find a key in the set that does not exist if a flush was
+      # performed between the two commands. This case should not be treated
+      # as an error.
+      context 'when there is a non-existing key in the set of cached reports' do
+        let(:cached_reports) do
+          [{ service_id: 's1',
+             credentials: Credentials.new(user_key: 'uk1'),
+             usage: { 'm1' => '1', 'm2' => '2' } },
+           { service_id: 's2',
+             credentials: Credentials.new(user_key: 'uk2'),
+             usage: { 'm1' => '10', 'm2' => '20' } }]
+        end
+
+        let(:cached_report_keys) do
+          cached_reports.map do |cached_report|
+            report_key(cached_report[:service_id], cached_report[:credentials])
+          end
+        end
+
+        # For this test, let's assume that only the first key exists
+        let(:existing_report) { cached_reports.first }
+
+        before do
+          # Store set that contains the keys of the cached reports
+          cached_report_keys.each do |hash|
+            redis.sadd(set_keys_cached_reports, hash)
+          end
+
+          # Store the cached reports as hashes where each metric is a field
+          key = report_key(existing_report[:service_id],
+                           existing_report[:credentials])
+
+          existing_report[:usage].each do |metric, value|
+            redis.hset(key, metric, value)
+          end
+        end
+
+        it 'returns all the reports to be flushed ignoring the non-existing keys' do
+          expect(subject.reports_to_flush).to eq [existing_report]
+        end
+      end
+
       # In these tests, we are checking all the steps that might fail.
       # They are heavily dependent on the Redis commands used.
       context 'when there is an error' do
