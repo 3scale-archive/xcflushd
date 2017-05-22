@@ -166,19 +166,41 @@ module Xcflushd
       let(:metric_auth) { { metric => Authorization.allow } }
 
       before do
-        allow(redis_pub).to receive(:publish).and_raise
-
         allow(authorizer)
             .to receive(:authorizations)
             .with(service_id, credentials, [metric])
             .and_return(authorizations)
       end
 
-      it 'logs a warning' do
-        subject.start
-        subject.send(:thread_pool).shutdown
-        subject.send(:thread_pool).wait_for_termination
-        expect(logger).to have_received(:warn)
+      context 'in all the attempts' do
+        before do
+          allow(redis_pub).to receive(:publish).and_raise
+        end
+
+        it 'logs a warning' do
+          subject.start
+          subject.send(:thread_pool).shutdown
+          subject.send(:thread_pool).wait_for_termination
+          expect(logger).to have_received(:warn)
+        end
+      end
+
+      context 'in some of the attempts' do
+        let(:attempts) { described_class.const_get(:PUBLISH_WAIT_TIMES).size }
+
+        before do
+          allow(redis_pub)
+              .to receive(:publish)
+              .exactly(attempts - 1).times
+              .and_raise
+        end
+
+        it 'does not log a warning' do
+          subject.start
+          subject.send(:thread_pool).shutdown
+          subject.send(:thread_pool).wait_for_termination
+          expect(logger).not_to have_received(:warn)
+        end
       end
     end
   end
