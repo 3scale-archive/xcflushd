@@ -33,7 +33,7 @@ RUN echo "Acquire::http {No-Cache=True;};" > /etc/apt/apt.conf.d/no-cache \
  && chown -R ${USER_NAME}: ${USER_HOME} \
  && apt-get -y -q clean
 
-RUN apt-get install -y -q openjdk-8-jre
+RUN apt-get install -y -q openjdk-8-jre && apt-get -y -q clean
 
 USER ${USER_NAME}
 
@@ -67,7 +67,7 @@ ARG BUILD_DEPS="libyaml-dev libreadline-dev libncurses-dev libffi-dev libgdbm3 l
 USER root
 RUN test -z "${BUILD_DEPS}" \
  || ( \
-      apt-get update && apt-get install -y -q ${BUILD_DEPS} \
+      apt-get update && apt-get install -y -q ${BUILD_DEPS} && apt-get -y -q clean \
     )
 
 WORKDIR ${APP_HOME}
@@ -81,7 +81,8 @@ RUN rbenv install -s \
  && gem update --system  \
  && ( bundler --version || gem install bundler ) \
  && bundle config --global jobs `grep -c processor /proc/cpuinfo` \
- && bundle config --global cache_all true
+ && bundle config --global cache_all true \
+ && gem cleanup all
 
 COPY Gemfile Gemfile.lock xcflushd.gemspec ${APP_HOME}/
 COPY lib/xcflushd/version.rb ${APP_HOME}/lib/xcflushd/
