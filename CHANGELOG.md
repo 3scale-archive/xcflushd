@@ -1,3 +1,15 @@
+## [1.2.0] - 2017-06-21
+
+Note: this version requires Apicast-XC >= v1.3.0.
+
+- The priority auth renewer now only publishes each response in the redis
+  pubsub channel once, unless there is an error while publishing.
+  We were publishing each response several times, but that was because of a
+  race condition caused by Apicast-XC that has been fixed. This change improves
+  performance a bit because it lowers the number of commands issued to Redis.
+- Introduced minor changes in the Dockerfile that decrease the image size.
+
+
 ## [1.1.0] - 2017-05-02
 - Switched from MRI to JRuby. our tests show that JRuby performs better than
   MRI when there is a high number of calls to be made to 3scale's backend in a
