@@ -94,6 +94,7 @@ USER root
 RUN chown -R ${USER_NAME}: ${APP_HOME}
 
 USER ${USER_NAME}
+RUN chmod u+x ${APP_HOME}/script/launch
 RUN bundle install
 
 CMD bundle exec exe/xcflushd run
