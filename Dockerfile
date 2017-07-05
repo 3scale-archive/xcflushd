@@ -97,7 +97,10 @@ USER root
 RUN chown -R ${USER_NAME}: ${APP_HOME}
 
 USER ${USER_NAME}
-RUN bundle install
+
+# ensure executable bits are preserved and install dependencies
+RUN find script/ bin/ -maxdepth 1 -type f | xargs chmod +x \
+ && bundle install
 
 ARG JRUBY_EXEC="jruby -Xcompile.invokedynamic=true -J-XX:ReservedCodeCacheSize=256M -J-XX:+UseCodeCacheFlushing -J-Xmn512m -J-Xms2048m -J-Xmx2048m -J-server -J-Djruby.objectspace.enabled=false -J-Djruby.thread.pool.enabled=true -J-Djruby.thread.pool.ttl=600 -J-Djruby.compile.mode=FORCE --server --headless -S"
 CMD ${JRUBY_EXEC} bundle exec exe/xcflushd run
