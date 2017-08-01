@@ -42,20 +42,28 @@ ARG RBENV_BINPATH="${RBENV_ROOT}/bin"
 ARG RBENV_PATH="${RBENV_ROOT}/shims:${RBENV_BINPATH}"
 
 ARG RBENV_RUBYBUILD_ROOT=${RBENV_ROOT}/plugins/ruby-build
+ARG RBENV_VERSION=
+ARG RBENV_RUBYBUILD_VERSION=
 
 RUN git clone --recursive --single-branch https://github.com/rbenv/rbenv.git ${RBENV_ROOT} \
  && git clone --recursive --single-branch https://github.com/rbenv/ruby-build.git ${RBENV_RUBYBUILD_ROOT} \
  && cd ${RBENV_ROOT} \
- && ( \
+ && if test "x${RBENV_VERSION}" = "x"; then ( \
       git checkout -f $(git tag | grep -P "^v?\d[\d.]*$" | sed -e "s/^v//g" | sort -V | tail -n 1) \
        || git checkout -f v$(git tag | grep -P "^v?\d[\d.]*$" | sed -e "s/^v//g" | sort -V | tail -n 1) \
-    ) \
+    ); \
+    else \
+      git checkout -f "${RBENV_VERSION}"; \
+    fi \
  && git submodule update --checkout \
  && cd ${RBENV_RUBYBUILD_ROOT} \
- && ( \
+ && if test "x${RBENV_RUBYBUILD_VERSION}" = "x"; then ( \
       git checkout -f $(git tag | grep -P "^v?\d[\d.]*$" | sed -e "s/^v//g" | sort -V | tail -n 1) \
        || git checkout -f v$(git tag | grep -P "^v?\d[\d.]*$" | sed -e "s/^v//g" | sort -V | tail -n 1) \
-    ) \
+    ); \
+    else \
+      git checkout -f "${RBENV_RUBYBUILD_VERSION}"; \
+    fi \
  && cd ${RBENV_ROOT} && src/configure && ( make -C src || true ) \
  && echo -n export PATH=${RBENV_BINPATH} >> ~/.bash_rbenv && echo ':$PATH' >> ~/.bash_rbenv \
  && echo 'eval "$(rbenv init -)"' >> ~/.bash_rbenv \
