@@ -39,6 +39,11 @@ $ make test
 
 That will run the unit test suite. It's using [Rspec](https://rspec.info).
 
+You can also customize the test command with:
+```
+$ make TEST_CMD=my_test_script test
+```
+
 Develop with:
 ```
 $ make bash

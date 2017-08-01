@@ -26,6 +26,8 @@ TARGET_IMAGE = $(REGISTRY)/$(REPOSITORY)/xcflushd:$(DOCKER_VERSION)
 MANIFEST ?= xcflushd-image-$(DOCKER_VERSION).manifest
 SIGNATURE ?= xcflushd-image-$(DOCKER_VERSION).signature
 
+TEST_CMD ?= script/test
+
 default: test
 
 .PHONY: info
@@ -41,7 +43,8 @@ info:
 	"* DOCKER_BUILD_ARGS = $(DOCKER_BUILD_ARGS)\n" \
 	"* MANIFEST = $(MANIFEST)\n" \
 	"* SIGNATURE = $(SIGNATURE)\n" \
-	"* KEY_ID = $(KEY_ID)\n"
+	"* KEY_ID = $(KEY_ID)\n" \
+	"* TEST_CMD = $(TEST_CMD)\n"
 
 .PHONY: build
 build:
@@ -79,7 +82,7 @@ verify: $(MANIFEST)
 	test "x$${OK}" = "x1"
 
 test: build
-	docker run --rm -t xcflushd script/test
+	docker run --rm -t xcflushd $(TEST_CMD)
 
 bash: build
 	docker run --rm -t -i -v $(PROJECT_PATH):$(DOCKER_PROJECT_PATH):z xcflushd /bin/bash
