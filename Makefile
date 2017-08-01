@@ -30,6 +30,10 @@ TEST_CMD ?= script/test
 
 default: test
 
+.PHONY: fetch-key
+fetch-key:
+	$(GPG) --recv-keys $(KEY_ID)
+
 .PHONY: info
 info:
 	@echo -e "\n" \
