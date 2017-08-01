@@ -56,10 +56,21 @@ You will need a Redis server running.
 
 ### Docker
 
+You can use `make build` to build Docker images. Run `make info` to obtain
+information about variables that control this process as well as other targets.
+
 Build:
 ```
 $ make build
 ```
+
+You can specify Dockerfile arguments like this:
+
+```
+$ make DOCKER_BUILD_ARGS="--build-arg RBENV_VERSION=v1.1.0 --build-arg RBENV_RUBYBUILD_VERSION=v20170523 --build-arg GEM_UPDATE=true" build
+```
+
+Check the Dockerfile for variables you can set that affect the build.
 
 Run:
 ```
@@ -111,6 +122,29 @@ Every X minutes (configurable) the flusher does two things:
 
 For more details, check the [design doc](docs/design.md).
 
+## Official Docker images
+
+Official Docker images are pushed to Docker Hub on release. We tag each image
+with the xcflushd version and a Docker release number. The Docker release number
+is bumped when a new image is uploaded with no changes in the code but just the
+image or packaging details.
+
+### Image Authenticity
+
+#### Requirements
+
+For this to work you will need [GnuPG 2](https://www.gnupg.org) and [Skopeo](https://github.com/projectatomic/skopeo), and you will need to import
+the `Red Hat 3scale API Management Platform Signing Key` public key into your
+GnuPG keyring. Such key is available on the usual PGP servers.
+
+Please refer to the [GnuPG documentation](https://www.gnupg.org/documentation/index.html) for details about importing the key.
+
+#### Verification
+
+You can verify the images if you so desire. For example, to verify
+`3scale/xcflushd:1.2.0-1`, you would run:
+
+> make TAG=v1.2.0 DOCKER_REL=1 verify
 
 ## Contributing
 
