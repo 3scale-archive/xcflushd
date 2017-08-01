@@ -81,8 +81,10 @@ verify: $(MANIFEST)
 	done; \
 	test "x$${OK}" = "x1"
 
+.PHONY: test
 test: build
-	docker run --rm -t xcflushd $(TEST_CMD)
+	docker run --rm -t xcflushd:$(DOCKER_VERSION) $(TEST_CMD)
 
+.PHONY: bash
 bash: build
-	docker run --rm -t -i -v $(PROJECT_PATH):$(DOCKER_PROJECT_PATH):z xcflushd /bin/bash
+	docker run --rm -t -i -v $(PROJECT_PATH):$(DOCKER_PROJECT_PATH):z xcflushd:$(DOCKER_VERSION) /bin/bash
