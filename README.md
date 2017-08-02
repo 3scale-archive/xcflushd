@@ -171,6 +171,16 @@ You can verify the images if you so desire. For example, to verify
 You could also specify a particular `KEY_ID` to check against.
 Run `make info` to get information about other variables.
 
+#### Signing The Easy Way
+
+For signing you basically want to have an ASCII armored file with the pair of
+private and public keys. The process expects a `$(KEY_ID).asc` file to be
+imported in the project's root directory.
+
+Using Docker you can avoid installing dependencies:
+
+> make TAG=v1.2.0 DOCKER_REL=1 sign-docker
+
 ## Contributing
 
 1. Fork the project
