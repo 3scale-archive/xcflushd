@@ -181,6 +181,35 @@ Using Docker you can avoid installing dependencies:
 
 > make TAG=v1.2.0 DOCKER_REL=1 sign-docker
 
+#### Verification Image Shell
+
+You can use the normal make targets (sign and verify) if you invoke
+
+> make verify-image-shell
+
+The results of your actions will be synchronized with the host files.
+
+##### Signing
+
+If you want to generate a signature file, you have to provide a file with the
+secret key, see `make info` for variables that specify its location.
+
+By default, a filename with the `KEY_ID` variable and an extension of `.asc`
+will be imported if existing, and then be used to sign the image.
+
+> make TAG=v1.2.0 KEY_ID=0x123456 sign
+
+(imports 0x123456.asc file)
+
+##### Verifying
+
+If you want to verify an image you have to provide a signature file, and
+optionally a filename in a similar fashion as for signing containing the public
+key of the `KEY_ID` variable. If such file is not present the system will try to
+fetch the key from the PGP servers.
+
+> make TAG=v1.2.0 KEY_ID=0x123456 verify
+
 ## Contributing
 
 1. Fork the project
