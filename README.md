@@ -136,7 +136,24 @@ image or packaging details.
 
 ### Image Authenticity
 
-#### Requirements
+#### Verification The Easy Way
+
+If you want to go the easy way and build a Docker image that can verify other
+Docker images, this is how to do it. If you prefer a more manual process to
+understand the details, skip to the next section.
+
+This requires Docker and GNU Make.
+
+The command you want to run is:
+
+> make TAG=v1.2.0 DOCKER_REL=1 verify-docker
+
+You could also specify a particular `KEY_ID` to check against.
+Run `make info` to get information about other variables.
+
+#### Verification The Not So Easy Way
+
+##### Requirements
 
 For this to work you will need [GnuPG 2](https://www.gnupg.org) and [Skopeo](https://github.com/projectatomic/skopeo), and you will need to import
 the `Red Hat 3scale API Management Platform Signing Key` public key into your
@@ -144,12 +161,15 @@ GnuPG keyring. Such key is available on the usual PGP servers.
 
 Please refer to the [GnuPG documentation](https://www.gnupg.org/documentation/index.html) for details about importing the key.
 
-#### Verification
+##### Verification
 
 You can verify the images if you so desire. For example, to verify
 `3scale/xcflushd:1.2.0-1`, you would run:
 
 > make TAG=v1.2.0 DOCKER_REL=1 verify
+
+You could also specify a particular `KEY_ID` to check against.
+Run `make info` to get information about other variables.
 
 ## Contributing
 
