@@ -19,6 +19,9 @@ REPOSITORY ?= 3scale
 # Alex's key until a Red Hat 3scale API Management Platform Signing Key becomes
 # official.
 KEY_ID ?= 0x33E0ED94CC4D33000F56B35ACE229595A73A83B0
+KEY_FILE_NAME ?= $(KEY_ID).asc
+KEY_FILE_DIR ?= $(PROJECT_PATH)
+KEY_FILE = $(KEY_FILE_DIR)/$(KEY_FILE_NAME)
 
 DOCKER_TAG = $(shell echo $(TAG) | sed -e 's/^v//')
 DOCKER_REL ?= 1
@@ -57,6 +60,8 @@ info:
 	"* MANIFEST = $(MANIFEST)\n" \
 	"* SIGNATURE = $(SIGNATURE)\n" \
 	"* KEY_ID = $(KEY_ID)\n" \
+	"* KEY_FILE_NAME = $(KEY_FILE_NAME)\n" \
+	"* KEY_FILE_DIR = $(KEY_FILE_DIR)\n" \
 	"* TEST_CMD = $(TEST_CMD)\n"
 
 .PHONY: build
@@ -77,18 +82,32 @@ $(MANIFEST):
 $(SIGNATURE): $(MANIFEST) secret-key
 	$(SKOPEO) standalone-sign $(MANIFEST) $(TARGET_IMAGE) $(KEY_ID) -o $(SIGNATURE)
 
+.PHONY: import-key
+import-key: $(KEY_FILE)
+	# This requires you to have $(KEY_ID) in your keyring or a key file around.
+	$(GPG) --import $(KEY_FILE)
+
 .PHONY: secret-key
 secret-key:
-	# This requires you to have $(KEY_ID) in your keyring or an .asc file around.
 	if ! $(GPG) --list-secret-keys $(KEY_ID); then \
-	    $(GPG) --import $(PROJECT_PATH)/$(KEY_ID).asc; \
+		$(MAKE) import-key; \
+	fi
+
+.PHONY: public-key
+public-key:
+	if ! $(GPG) --list-keys $(KEY_ID); then \
+		if test -r $(KEY_FILE); then \
+		    $(MAKE) import-key; \
+		else \
+		    $(MAKE) fetch-key; \
+		fi; \
 	fi
 
 .PHONY: sign
 sign: $(SIGNATURE)
 
 .PHONY: verify
-verify: $(MANIFEST)
+verify: $(MANIFEST) public-key
 	# Trying all subkeys
 	@OK=0; for k in $$($(GPG) --list-keys --with-fingerprint --with-fingerprint --with-colons $(KEY_ID) | grep "^fpr:" | cut -d: -f10); do \
 	    echo -n "Checking key $${k}... "; \
@@ -122,6 +141,11 @@ sign-docker: verify-image
 .PHONY: verify-docker
 verify-docker: verify-image
 	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) fetch-key verify
+
+.PHONY: verify-image-shell
+verify-image-shell: verify-image
+	@echo For this target please define VERIFY_IMAGE_CMD.
+	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE)
 
 .PHONY: clean-verify-image
 clean-verify-image:
