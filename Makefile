@@ -74,8 +74,15 @@ push:
 $(MANIFEST):
 	$(SKOPEO) inspect --raw docker://$(TARGET_IMAGE) > $(MANIFEST)
 
-$(SIGNATURE): $(MANIFEST)
+$(SIGNATURE): $(MANIFEST) secret-key
 	$(SKOPEO) standalone-sign $(MANIFEST) $(TARGET_IMAGE) $(KEY_ID) -o $(SIGNATURE)
+
+.PHONY: secret-key
+secret-key:
+	# This requires you to have $(KEY_ID) in your keyring or an .asc file around.
+	if ! $(GPG) --list-secret-keys $(KEY_ID); then \
+	    $(GPG) --import $(PROJECT_PATH)/$(KEY_ID).asc; \
+	fi
 
 .PHONY: sign
 sign: $(SIGNATURE)
@@ -107,6 +114,10 @@ verify-image:
 	if ! $(DOCKER) history --quiet $(VERIFY_IMAGE) 2> /dev/null >&2; then \
 	    $(DOCKER) build -t $(VERIFY_IMAGE) -f $(VERIFY_DOCKERFILE) $(PROJECT_PATH); \
 	fi
+
+.PHONY: sign-docker
+sign-docker: verify-image
+	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) secret-key sign
 
 .PHONY: verify-docker
 verify-docker: verify-image
