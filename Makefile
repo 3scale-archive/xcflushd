@@ -32,6 +32,9 @@ SIGNATURE ?= $(PROJECT_NAME)-image-$(DOCKER_VERSION).signature
 
 TEST_CMD ?= script/test
 
+VERIFY_DOCKERFILE = Dockerfile.verify
+VERIFY_IMAGE = $(PROJECT_NAME):verify
+
 default: test
 
 .PHONY: fetch-key
@@ -98,3 +101,17 @@ test: build
 .PHONY: bash
 bash: build
 	$(DOCKER) run --rm -t -i -v $(PROJECT_PATH):$(DOCKER_PROJECT_PATH):z $(LOCAL_IMAGE) /bin/bash
+
+.PHONY: verify-image
+verify-image:
+	if ! $(DOCKER) history --quiet $(VERIFY_IMAGE) 2> /dev/null >&2; then \
+	    $(DOCKER) build -t $(VERIFY_IMAGE) -f $(VERIFY_DOCKERFILE) $(PROJECT_PATH); \
+	fi
+
+.PHONY: verify-docker
+verify-docker: verify-image
+	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) fetch-key verify
+
+.PHONY: clean-verify-image
+clean-verify-image:
+	$(DOCKER) rmi $(VERIFY_IMAGE)
