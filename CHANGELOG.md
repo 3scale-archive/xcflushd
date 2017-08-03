@@ -1,3 +1,10 @@
+## [1.2.1] - 2017-08-03
+
+- Added targets in Makefile to verify Docker images (see README.md)
+- Upgraded Nokogiri dependency to 1.8.0
+- Upgraded default Ruby interpreter to JRuby 9.1.12.0
+- Dropped support for MRI in Gemfile.lock.
+
 ## [1.2.0] - 2017-06-21
 
 Note: this version requires Apicast-XC >= v1.3.0.
