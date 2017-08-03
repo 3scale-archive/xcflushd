@@ -39,6 +39,11 @@ $ make test
 
 That will run the unit test suite. It's using [Rspec](https://rspec.info).
 
+You can also customize the test command with:
+```
+$ make TEST_CMD=my_test_script test
+```
+
 Develop with:
 ```
 $ make bash
@@ -56,10 +61,21 @@ You will need a Redis server running.
 
 ### Docker
 
+You can use `make build` to build Docker images. Run `make info` to obtain
+information about variables that control this process as well as other targets.
+
 Build:
 ```
 $ make build
 ```
+
+You can specify Dockerfile arguments like this:
+
+```
+$ make DOCKER_BUILD_ARGS="--build-arg RBENV_VERSION=v1.1.0 --build-arg RBENV_RUBYBUILD_VERSION=v20170523 --build-arg GEM_UPDATE=true" build
+```
+
+Check the Dockerfile for variables you can set that affect the build.
 
 Run:
 ```
@@ -111,6 +127,88 @@ Every X minutes (configurable) the flusher does two things:
 
 For more details, check the [design doc](docs/design.md).
 
+## Official Docker images
+
+Official Docker images are pushed to Docker Hub on release. We tag each image
+with the xcflushd version and a Docker release number. The Docker release number
+is bumped when a new image is uploaded with no changes in the code but just the
+image or packaging details.
+
+### Image Authenticity
+
+#### Verification The Easy Way
+
+If you want to go the easy way and build a Docker image that can verify other
+Docker images, this is how to do it. If you prefer a more manual process to
+understand the details, skip to the next section.
+
+This requires Docker and GNU Make.
+
+The command you want to run is:
+
+> make TAG=v1.2.0 DOCKER_REL=1 verify-docker
+
+You could also specify a particular `KEY_ID` to check against.
+Run `make info` to get information about other variables.
+
+#### Verification The Not So Easy Way
+
+##### Requirements
+
+For this to work you will need [GnuPG 2](https://www.gnupg.org) and [Skopeo](https://github.com/projectatomic/skopeo), and you will need to import
+the `Red Hat 3scale API Management Platform Signing Key` public key into your
+GnuPG keyring. Such key is available on the usual PGP servers.
+
+Please refer to the [GnuPG documentation](https://www.gnupg.org/documentation/index.html) for details about importing the key.
+
+##### Verification
+
+You can verify the images if you so desire. For example, to verify
+`3scale/xcflushd:1.2.0-1`, you would run:
+
+> make TAG=v1.2.0 DOCKER_REL=1 verify
+
+You could also specify a particular `KEY_ID` to check against.
+Run `make info` to get information about other variables.
+
+#### Signing The Easy Way
+
+For signing you basically want to have an ASCII armored file with the pair of
+private and public keys. The process expects a `$(KEY_ID).asc` file to be
+imported in the project's root directory.
+
+Using Docker you can avoid installing dependencies:
+
+> make TAG=v1.2.0 DOCKER_REL=1 sign-docker
+
+#### Verification Image Shell
+
+You can use the normal make targets (sign and verify) if you invoke
+
+> make verify-image-shell
+
+The results of your actions will be synchronized with the host files.
+
+##### Signing
+
+If you want to generate a signature file, you have to provide a file with the
+secret key, see `make info` for variables that specify its location.
+
+By default, a filename with the `KEY_ID` variable and an extension of `.asc`
+will be imported if existing, and then be used to sign the image.
+
+> make TAG=v1.2.0 KEY_ID=0x123456 sign
+
+(imports 0x123456.asc file)
+
+##### Verifying
+
+If you want to verify an image you have to provide a signature file, and
+optionally a filename in a similar fashion as for signing containing the public
+key of the `KEY_ID` variable. If such file is not present the system will try to
+fetch the key from the PGP servers.
+
+> make TAG=v1.2.0 KEY_ID=0x123456 verify
 
 ## Contributing
 

@@ -1,0 +1,10 @@
+FROM fedora:26
+
+RUN dnf install -y make which gnupg2 skopeo && dnf clean all \
+ && adduser --home /home/user --shell /bin/bash user
+
+USER user
+RUN mkdir /home/user/app
+WORKDIR /home/user/app
+
+CMD /bin/bash

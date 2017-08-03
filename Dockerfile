@@ -1,5 +1,5 @@
 FROM ubuntu:xenial
-MAINTAINER Alejandro Martinez Ruiz <alex@3scale.net>
+MAINTAINER Alejandro Martinez Ruiz <amr@redhat.com>
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -42,20 +42,28 @@ ARG RBENV_BINPATH="${RBENV_ROOT}/bin"
 ARG RBENV_PATH="${RBENV_ROOT}/shims:${RBENV_BINPATH}"
 
 ARG RBENV_RUBYBUILD_ROOT=${RBENV_ROOT}/plugins/ruby-build
+ARG RBENV_VERSION=
+ARG RBENV_RUBYBUILD_VERSION=
 
 RUN git clone --recursive --single-branch https://github.com/rbenv/rbenv.git ${RBENV_ROOT} \
  && git clone --recursive --single-branch https://github.com/rbenv/ruby-build.git ${RBENV_RUBYBUILD_ROOT} \
  && cd ${RBENV_ROOT} \
- && ( \
+ && if test "x${RBENV_VERSION}" = "x"; then ( \
       git checkout -f $(git tag | grep -P "^v?\d[\d.]*$" | sed -e "s/^v//g" | sort -V | tail -n 1) \
        || git checkout -f v$(git tag | grep -P "^v?\d[\d.]*$" | sed -e "s/^v//g" | sort -V | tail -n 1) \
-    ) \
+    ); \
+    else \
+      git checkout -f "${RBENV_VERSION}"; \
+    fi \
  && git submodule update --checkout \
  && cd ${RBENV_RUBYBUILD_ROOT} \
- && ( \
+ && if test "x${RBENV_RUBYBUILD_VERSION}" = "x"; then ( \
       git checkout -f $(git tag | grep -P "^v?\d[\d.]*$" | sed -e "s/^v//g" | sort -V | tail -n 1) \
        || git checkout -f v$(git tag | grep -P "^v?\d[\d.]*$" | sed -e "s/^v//g" | sort -V | tail -n 1) \
-    ) \
+    ); \
+    else \
+      git checkout -f "${RBENV_RUBYBUILD_VERSION}"; \
+    fi \
  && cd ${RBENV_ROOT} && src/configure && ( make -C src || true ) \
  && echo -n export PATH=${RBENV_BINPATH} >> ~/.bash_rbenv && echo ':$PATH' >> ~/.bash_rbenv \
  && echo 'eval "$(rbenv init -)"' >> ~/.bash_rbenv \
@@ -75,16 +83,31 @@ COPY .ruby-version .ruby-gemset ${APP_HOME}/
 
 USER ${USER_NAME}
 ENV PATH="${RBENV_PATH}:${PATH}"
+
+ARG GEM_UPDATE=false
 RUN rbenv install -s \
  && rbenv rehash \
  && echo 'gem: --no-document' >> ~/.gemrc \
- && gem update --system  \
- && ( bundler --version || gem install bundler ) \
+ && if test "${GEM_UPDATE}x" = "truex"; then \
+      gem update --system -N ; \
+    fi \
+ && gem env
+
+COPY Gemfile.lock ${APP_HOME}/
+ARG BUNDLE_VERSION_MATCH=true
+RUN BUNDLED_WITH=$(cat Gemfile.lock | \
+      grep -A 1 "^BUNDLED WITH$" | tail -n 1 | sed -e 's/\s//g') \
+ && if test "${BUNDLE_VERSION_MATCH}x" = "truex"; then \
+      gem install -N bundler --version "${BUNDLED_WITH}" ; \
+    else \
+      gem install -N bundler ; \
+    fi \
+ && echo Using $(bundle --version), originally bundled with ${BUNDLED_WITH} \
  && bundle config --global jobs `grep -c processor /proc/cpuinfo` \
  && bundle config --global cache_all true \
  && gem cleanup all
 
-COPY Gemfile Gemfile.lock xcflushd.gemspec ${APP_HOME}/
+COPY Gemfile xcflushd.gemspec ${APP_HOME}/
 COPY lib/xcflushd/version.rb ${APP_HOME}/lib/xcflushd/
 USER root
 RUN chown -R ${USER_NAME}: ${APP_HOME}
