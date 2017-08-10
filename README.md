@@ -136,6 +136,8 @@ image or packaging details.
 
 ### Image Authenticity
 
+The image can be verified using the signature attached to each release at the GitHub [Releases page](https://github.com/3scale/xcflushd/releases) (starting from version `v1.2.1`). The signature file has a predefined name: `xcflushd-image-<DOCKER_VERSION>.signature`.
+
 #### Verification The Easy Way
 
 If you want to go the easy way and build a Docker image that can verify other
@@ -146,7 +148,7 @@ This requires Docker and GNU Make.
 
 The command you want to run is:
 
-> make TAG=v1.2.0 DOCKER_REL=1 verify-docker
+> make TAG=v1.2.1 DOCKER_REL=1 verify-docker
 
 You could also specify a particular `KEY_ID` to check against.
 Run `make info` to get information about other variables.
@@ -161,12 +163,14 @@ GnuPG keyring. Such key is available on the usual PGP servers.
 
 Please refer to the [GnuPG documentation](https://www.gnupg.org/documentation/index.html) for details about importing the key.
 
+You will also need to place the relevant `.signature` file from the release page in the main directory of the cloned repository.
+
 ##### Verification
 
 You can verify the images if you so desire. For example, to verify
-`3scale/xcflushd:1.2.0-1`, you would run:
+`3scale/xcflushd:1.2.1-1`, you would run:
 
-> make TAG=v1.2.0 DOCKER_REL=1 verify
+> make TAG=v1.2.1 DOCKER_REL=1 verify
 
 You could also specify a particular `KEY_ID` to check against.
 Run `make info` to get information about other variables.
@@ -179,7 +183,7 @@ imported in the project's root directory.
 
 Using Docker you can avoid installing dependencies:
 
-> make TAG=v1.2.0 DOCKER_REL=1 sign-docker
+> make TAG=v1.2.1 DOCKER_REL=1 sign-docker
 
 #### Verification Image Shell
 
@@ -197,7 +201,7 @@ secret key, see `make info` for variables that specify its location.
 By default, a filename with the `KEY_ID` variable and an extension of `.asc`
 will be imported if existing, and then be used to sign the image.
 
-> make TAG=v1.2.0 KEY_ID=0x123456 sign
+> make TAG=v1.2.1 DOCKER_REL=1 KEY_ID=0x123456 sign
 
 (imports 0x123456.asc file)
 
@@ -205,10 +209,10 @@ will be imported if existing, and then be used to sign the image.
 
 If you want to verify an image you have to provide a signature file, and
 optionally a filename in a similar fashion as for signing containing the public
-key of the `KEY_ID` variable. If such file is not present the system will try to
-fetch the key from the PGP servers.
+key of the `KEY_ID` variable. If such files are not present the system will try
+to fetch the signature file from Github and the key from the PGP servers.
 
-> make TAG=v1.2.0 KEY_ID=0x123456 verify
+> make TAG=v1.2.1 DOCKER_REL=1 KEY_ID=0x123456 verify
 
 ## Contributing
 
