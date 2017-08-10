@@ -46,6 +46,11 @@ WARN_MARK = [WW]
 
 DOCKER_VERIFY_RUN := $(DOCKER) run --rm --security-opt label:disable \
 	-v $(PROJECT_PATH):/opt/app -ti $(VERIFY_IMAGE)
+# Pass here all variables important for running the make instance inside Docker
+DOCKER_VERIFY_MAKE = $(DOCKER_VERIFY_RUN) make \
+		     TAG=$(TAG) DOCKER_RELEASE=$(DOCKER_RELEASE) \
+		     TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
+		     SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID)
 
 default: test
 
@@ -157,12 +162,17 @@ verify: $(MANIFEST) public-key
 	    echo -n "Checking key $${k}... "; \
 	    if $(SKOPEO) standalone-verify $(MANIFEST) $(TARGET_IMAGE) $${k} $(SIGNATURE) 2> /dev/null; then \
 	        OK=1; \
-			break; \
-		else \
-			echo "Nope"; \
-		fi; \
+	        break; \
+	    else \
+	        echo "Nope"; \
+	    fi; \
 	done; \
-	test "x$${OK}" = "x1"
+	if test "x$${OK}" = "x1"; then \
+	    echo -e "\n$(BANNER_LINE)\n$(INFO_MARK) Signature verification OK\n$(BANNER_LINE)"; \
+	else \
+	    echo -e "\n$(BANNER_LINE)\n$(WARN_MARK) Signature verification FAILED\n$(BANNER_LINE)"; \
+	    false; \
+	fi
 
 .PHONY: test
 test: build
@@ -180,13 +190,11 @@ verify-image:
 
 .PHONY: sign-docker
 sign-docker: verify-image
-	$(DOCKER_VERIFY_RUN) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
-		SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) secret-key sign
+	$(DOCKER_VERIFY_MAKE) secret-key sign
 
 .PHONY: verify-docker
 verify-docker: verify-image
-	$(DOCKER_VERIFY_RUN) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
-		SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) fetch-key verify
+	$(DOCKER_VERIFY_MAKE) fetch-key verify
 
 .PHONY: verify-image-shell
 verify-image-shell: verify-image
