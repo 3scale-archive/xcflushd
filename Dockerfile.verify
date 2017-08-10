@@ -1,6 +1,6 @@
 FROM fedora:26
 
-RUN dnf install -y make which gnupg2 skopeo && dnf clean all \
+RUN dnf install -y make which gnupg2 skopeo curl && dnf clean all \
  && mkdir -p /opt/app
 
 WORKDIR /opt/app
