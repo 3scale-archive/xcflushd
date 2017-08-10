@@ -48,7 +48,7 @@ DOCKER_VERIFY_RUN := $(DOCKER) run --rm --security-opt label:disable \
 	-v $(PROJECT_PATH):/opt/app -ti $(VERIFY_IMAGE)
 # Pass here all variables important for running the make instance inside Docker
 DOCKER_VERIFY_MAKE = $(DOCKER_VERIFY_RUN) make \
-		     TAG=$(TAG) DOCKER_RELEASE=$(DOCKER_RELEASE) \
+		     TAG=$(TAG) DOCKER_REL=$(DOCKER_REL) \
 		     TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
 		     SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID)
 
@@ -87,7 +87,7 @@ fetch-key:
 
 .PHONY: fetch-signature
 fetch-signature:
-	$(call pinfo,"Fetching signature for $(PROJECT_NAME) $(TAG)-$(DOCKER_RELEASE)...")
+	$(call pinfo,"Fetching signature for $(PROJECT_NAME) $(TAG)-$(DOCKER_REL)...")
 	$(CURL) -L -O -s https://github.com/$(GITHUB)/releases/download/v$(TAG)/$(SIGNATURE)
 
 .PHONY: info
