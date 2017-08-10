@@ -6,10 +6,12 @@ DOCKER_APP_HOME := /home/$(DOCKER_USER)
 DOCKER_PROJECT_PATH := $(DOCKER_APP_HOME)/app
 
 PROJECT_NAME ?= xcflushd
+GITHUB ?= 3scale/$(PROJECT_NAME)
 
 # GnuPG 2 and skopeo are needed
 GPG ?= $(shell which gpg2 2> /dev/null)
 SKOPEO ?= $(shell which skopeo 2> /dev/null)
+CURL ?= $(shell which curl 2> /dev/null)
 DOCKER ?= $(shell which docker 2> /dev/null)
 TAG ?= $(shell git describe --dirty)
 
@@ -41,6 +43,14 @@ VERIFY_IMAGE = $(PROJECT_NAME):verify
 BANNER_LINE = ******************************************************************
 INFO_MARK = [II]
 WARN_MARK = [WW]
+
+DOCKER_VERIFY_RUN := $(DOCKER) run --rm --security-opt label:disable \
+	-v $(PROJECT_PATH):/opt/app -ti $(VERIFY_IMAGE)
+# Pass here all variables important for running the make instance inside Docker
+DOCKER_VERIFY_MAKE = $(DOCKER_VERIFY_RUN) make \
+		     TAG=$(TAG) DOCKER_RELEASE=$(DOCKER_RELEASE) \
+		     TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
+		     SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID)
 
 default: test
 
@@ -75,13 +85,20 @@ release:
 fetch-key:
 	$(GPG) --recv-keys $(KEY_ID)
 
+.PHONY: fetch-signature
+fetch-signature:
+	$(call pinfo,"Fetching signature for $(PROJECT_NAME) $(TAG)-$(DOCKER_RELEASE)...")
+	$(CURL) -L -O -s https://github.com/$(GITHUB)/releases/download/v$(TAG)/$(SIGNATURE)
+
 .PHONY: info
 info:
 	@echo -e "\n" \
 	"The following variables _can_ be modified:\n\n" \
 	"* PROJECT_NAME = $(PROJECT_NAME)\n" \
+	"* GITHUB = $(GITHUB)\n" \
 	"* GPG = $(GPG)\n" \
 	"* SKOPEO = $(SKOPEO)\n" \
+	"* CURL = $(CURL)\n" \
 	"* DOCKER = $(DOCKER)\n" \
 	"* REGISTRY = $(REGISTRY)\n" \
 	"* REPOSITORY = $(REPOSITORY)\n" \
@@ -139,17 +156,23 @@ sign: $(SIGNATURE)
 
 .PHONY: verify
 verify: $(MANIFEST) public-key
+	@test -r $(SIGNATURE) || $(MAKE) info fetch-signature
 	# Trying all subkeys
 	@OK=0; for k in $$($(GPG) --list-keys --with-fingerprint --with-fingerprint --with-colons $(KEY_ID) | grep "^fpr:" | cut -d: -f10); do \
 	    echo -n "Checking key $${k}... "; \
 	    if $(SKOPEO) standalone-verify $(MANIFEST) $(TARGET_IMAGE) $${k} $(SIGNATURE) 2> /dev/null; then \
 	        OK=1; \
-			break; \
-		else \
-			echo "Nope"; \
-		fi; \
+	        break; \
+	    else \
+	        echo "Nope"; \
+	    fi; \
 	done; \
-	test "x$${OK}" = "x1"
+	if test "x$${OK}" = "x1"; then \
+	    echo -e "\n$(BANNER_LINE)\n$(INFO_MARK) Signature verification OK\n$(BANNER_LINE)"; \
+	else \
+	    echo -e "\n$(BANNER_LINE)\n$(WARN_MARK) Signature verification FAILED\n$(BANNER_LINE)"; \
+	    false; \
+	fi
 
 .PHONY: test
 test: build
@@ -167,16 +190,16 @@ verify-image:
 
 .PHONY: sign-docker
 sign-docker: verify-image
-	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) secret-key sign
+	$(DOCKER_VERIFY_MAKE) secret-key sign
 
 .PHONY: verify-docker
 verify-docker: verify-image
-	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) fetch-key verify
+	$(DOCKER_VERIFY_MAKE) fetch-key verify
 
 .PHONY: verify-image-shell
 verify-image-shell: verify-image
 	@echo For this target please define VERIFY_IMAGE_CMD.
-	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE)
+	$(DOCKER_VERIFY_RUN) $(VERIFY_IMAGE_CMD)
 
 .PHONY: clean-verify-image
 clean-verify-image:
