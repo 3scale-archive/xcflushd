@@ -6,10 +6,12 @@ DOCKER_APP_HOME := /home/$(DOCKER_USER)
 DOCKER_PROJECT_PATH := $(DOCKER_APP_HOME)/app
 
 PROJECT_NAME ?= xcflushd
+GITHUB ?= 3scale/$(PROJECT_NAME)
 
 # GnuPG 2 and skopeo are needed
 GPG ?= $(shell which gpg2 2> /dev/null)
 SKOPEO ?= $(shell which skopeo 2> /dev/null)
+CURL ?= $(shell which curl 2> /dev/null)
 DOCKER ?= $(shell which docker 2> /dev/null)
 TAG ?= $(shell git describe --dirty)
 
@@ -78,13 +80,20 @@ release:
 fetch-key:
 	$(GPG) --recv-keys $(KEY_ID)
 
+.PHONY: fetch-signature
+fetch-signature:
+	$(call pinfo,"Fetching signature for $(PROJECT_NAME) $(TAG)-$(DOCKER_RELEASE)...")
+	$(CURL) -L -O -s https://github.com/$(GITHUB)/releases/download/v$(TAG)/$(SIGNATURE)
+
 .PHONY: info
 info:
 	@echo -e "\n" \
 	"The following variables _can_ be modified:\n\n" \
 	"* PROJECT_NAME = $(PROJECT_NAME)\n" \
+	"* GITHUB = $(GITHUB)\n" \
 	"* GPG = $(GPG)\n" \
 	"* SKOPEO = $(SKOPEO)\n" \
+	"* CURL = $(CURL)\n" \
 	"* DOCKER = $(DOCKER)\n" \
 	"* REGISTRY = $(REGISTRY)\n" \
 	"* REPOSITORY = $(REPOSITORY)\n" \
@@ -142,6 +151,7 @@ sign: $(SIGNATURE)
 
 .PHONY: verify
 verify: $(MANIFEST) public-key
+	@test -r $(SIGNATURE) || $(MAKE) info fetch-signature
 	# Trying all subkeys
 	@OK=0; for k in $$($(GPG) --list-keys --with-fingerprint --with-fingerprint --with-colons $(KEY_ID) | grep "^fpr:" | cut -d: -f10); do \
 	    echo -n "Checking key $${k}... "; \
