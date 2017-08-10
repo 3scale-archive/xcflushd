@@ -42,6 +42,9 @@ BANNER_LINE = ******************************************************************
 INFO_MARK = [II]
 WARN_MARK = [WW]
 
+DOCKER_VERIFY_RUN := $(DOCKER) run --rm --security-opt label:disable \
+	-v $(PROJECT_PATH):/opt/app -ti $(VERIFY_IMAGE)
+
 default: test
 
 define pinfo
@@ -167,16 +170,18 @@ verify-image:
 
 .PHONY: sign-docker
 sign-docker: verify-image
-	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) secret-key sign
+	$(DOCKER_VERIFY_RUN) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
+		SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) secret-key sign
 
 .PHONY: verify-docker
 verify-docker: verify-image
-	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) fetch-key verify
+	$(DOCKER_VERIFY_RUN) make TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
+		SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID) fetch-key verify
 
 .PHONY: verify-image-shell
 verify-image-shell: verify-image
 	@echo For this target please define VERIFY_IMAGE_CMD.
-	$(DOCKER) run --rm --security-opt label:disable -v $(PROJECT_PATH):/home/user/app -ti $(VERIFY_IMAGE)
+	$(DOCKER_VERIFY_RUN) $(VERIFY_IMAGE_CMD)
 
 .PHONY: clean-verify-image
 clean-verify-image:
