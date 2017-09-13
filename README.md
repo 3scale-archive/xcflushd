@@ -136,7 +136,20 @@ image or packaging details.
 
 ### Image Authenticity
 
-The image can be verified using the signature attached to each release at the GitHub [Releases page](https://github.com/3scale/xcflushd/releases) (starting from version `v1.2.1`). The signature file has a predefined name: `xcflushd-image-<DOCKER_VERSION>.signature`.
+#### Overview
+
+The image authenticity is based on PGP keys. The authenticity of an image can be verified using the signature attached to each release at the GitHub [Releases page](https://github.com/3scale/xcflushd/releases) (starting from version `v1.2.1`). The signature file has a predefined name: `xcflushd-image-<DOCKER_VERSION>.signature`. The signature is generated using a PGP private key. The corresponding PGP public key is published to a PGP keyserver for retrieval and usage in image verification.
+
+The process of verification involves details such as fetching keys from PGP keyring, subkeys, inspecting the docker image etc. The Makefile simplifies this process of verification two makefile targets:
+* verify
+* verify-docker
+
+Either of these target will perform verification and print a pass/fail message. The use of these target is described in more detail in later sections.
+
+The above Makefile targets use the following tools for verification:
+
+* gpg2 : OpenPGP encryption and signing tool.  This is used to fetch the published PGP public keys and add them to the PGP keyring.
+* skopeo:  A command line utility that provides various operations with container images and container registries. This verifies the authenticity using the PGP keys from the PGP keyring, the image and the signature from the Docker hub.
 
 #### Verification The Easy Way
 
