@@ -164,7 +164,15 @@ sign: $(SIGNATURE)
 
 .PHONY: verify
 verify: $(MANIFEST) public-key
+	@if test "x$$(stat -c%s $(MANIFEST))" = "x0"; then \
+		echo "The manifest file $(MANIFEST) looks broken, please remove and retry" >&2 ; \
+		false ; \
+	fi
 	@test -r $(SIGNATURE) || $(MAKE) info fetch-signature
+	@if test "x$$(stat -c%s $(SIGNATURE))" = "x0"; then \
+		echo "The signature file $(SIGNATURE) looks broken, please remove and retry" >&2 ; \
+		false ; \
+	fi
 	# Trying all subkeys
 	@OK=0; for k in $$($(GPG) --list-keys --with-fingerprint --with-fingerprint --with-colons $(KEY_ID) | grep "^fpr:" | cut -d: -f10); do \
 	    echo -n "Checking key $${k}... "; \
