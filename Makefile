@@ -13,7 +13,7 @@ GPG ?= $(shell which gpg2 2> /dev/null)
 SKOPEO ?= $(shell which skopeo 2> /dev/null)
 CURL ?= $(shell which curl 2> /dev/null)
 DOCKER ?= $(shell which docker 2> /dev/null)
-TAG ?= $(shell git describe --dirty)
+TAG ?= $(shell git describe --dirty | sed -E -e "s/v([0-9]+.*)/\1/")
 
 REGISTRY ?= registry.hub.docker.com
 REPOSITORY ?= 3scale
