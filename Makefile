@@ -176,7 +176,7 @@ verify: $(MANIFEST) public-key
 	# Trying all subkeys
 	@OK=0; for k in $$($(GPG) --list-keys --with-fingerprint --with-fingerprint --with-colons $(KEY_ID) | grep "^fpr:" | cut -d: -f10); do \
 	    echo -n "Checking key $${k}... "; \
-	    if $(SKOPEO) standalone-verify $(MANIFEST) $(TARGET_IMAGE) $${k} $(SIGNATURE) 2> /dev/null; then \
+	    if $(SKOPEO) standalone-verify $(MANIFEST) $(TARGET_IMAGE) $${k} $(SIGNATURE) 2>> /tmp/skopeo-err; then \
 	        OK=1; \
 	        break; \
 	    else \
@@ -185,8 +185,12 @@ verify: $(MANIFEST) public-key
 	done; \
 	if test "x$${OK}" = "x1"; then \
 	    echo -e "\n$(BANNER_LINE)\n$(INFO_MARK) Signature verification OK\n$(BANNER_LINE)"; \
+		rm /tmp/skopeo-err; \
 	else \
 	    echo -e "\n$(BANNER_LINE)\n$(WARN_MARK) Signature verification FAILED\n$(BANNER_LINE)"; \
+		echo -e "\nError output:\n"; \
+		cat /tmp/skopeo-err; \
+		rm /tmp/skopeo-err; \
 	    false; \
 	fi
 
