@@ -136,41 +136,57 @@ image or packaging details.
 
 ### Image Authenticity
 
-The image can be verified using the signature attached to each release at the GitHub [Releases page](https://github.com/3scale/xcflushd/releases) (starting from version `v1.2.1`). The signature file has a predefined name: `xcflushd-image-<DOCKER_VERSION>.signature`.
+This section describes both verification and signing of docker image.
 
-#### Verification The Easy Way
+#### Verification
 
-If you want to go the easy way and build a Docker image that can verify other
-Docker images, this is how to do it. If you prefer a more manual process to
-understand the details, skip to the next section.
+The authenticity of an image can be verified using the signature attached to each release at the GitHub [Releases page](https://github.com/3scale/xcflushd/releases) (starting from version `v1.2.1`). The signature file has a predefined name: `xcflushd-image-<DOCKER_VERSION>.signature`.
+
+The signature is generated using a PGP private key. The corresponding PGP public key is published to PGP keyservers for retrieval and usage in image verification.
+
+The process of verification involves details such as fetching keys from PGP keyring, subkeys, inspecting the docker image etc. The Makefile in the project directory simplifies this process of verification using two makefile targets:
+* verify
+* verify-docker
+
+Either of these targets will perform verification and print a pass/fail message. The use of these target is described in more detail in later sections.
+
+The above Makefile targets use the following tools for verification:
+
+* [GnuPG 2](https://www.gnupg.org) : OpenPGP encryption and signing tool.  This is used to fetch the published PGP public keys and add them to the PGP keyring.
+* [Skopeo](https://github.com/projectatomic/skopeo):  A command line utility that provides various operations with container images and container registries. This utility is used to verify the authenticity using the PGP public key, the image and the signature from the Docker hub.
+
+##### Makefile target: verify
+To verify an  image ( e.g. `3scale/xcflushd:1.2.1-1` ), run:
+
+> make TAG=1.2.1 DOCKER_REL=1 verify
+
+You could also specify a particular `KEY_ID` to check against.
+Run `make info` to get information about other variables.
+
+The `verify` target assumes that GnuPG 2 and Skopeo are installed and searches for `gpg2` and `skopeo` utilities on the bash shell command path. On some RPM-based OS, `gpg2` and/or `skopeo` are either installed or easily installable using a packet manager. Verification using the verify target is fairly simple to use. On other OS ( e.g non RPM based ), installing nuPG 2 and Skopeo can be more complicated. On such systems verification using the verify `verify-docker` target is probably easier to use than the `verify` target.
+
+To install gpg2 and skpeo on Red Hat Enterprise Linux (RHEL), use the following instructions.
+1. gpg2 is installed by default.
+1. skopeo can be installed as follows:
+   * sudo yum repolist all ## List all repositories
+   * Find the \*-extras repository
+   * sudo yum-config-manager --enable rhui-REGION-rhel-server-extras # Enable extras repository
+   * sudo yum install skopeo
+
+The `verify` target :
+* If an ASCII armored file $(KEY_ID).asc exists, then the keys are imported form this file into the PGP ring. The PGP keys are imported from the PGP key servers only if the $(KEY_ID).asc file does not exist. $(KEY_ID) is the value of the PGP Key ID that was used in signing of the docker image.
+* Fetches PGP public keys associated with the $(KEY_ID) from the PGP keyring, iterates over them and uses skopeo tool to verify the authenticity of the image.
+* Sucess/failure message is printed.
+
+##### Makefile target: verify-docker
+
+The verify-docker target builds a Docker image that can verify other docker-images. This method is easy to use on any OS but particularly useful on OS where gpg2 and skopeo tools are not easy to install.
 
 This requires Docker and GNU Make.
 
 The command you want to run for verifying the docker release 1 of v1.2.1 is:
 
 > make TAG=1.2.1 DOCKER_REL=1 verify-docker
-
-You could also specify a particular `KEY_ID` to check against.
-Run `make info` to get information about other variables.
-
-#### Verification The Not So Easy Way
-
-##### Requirements
-
-For this to work you will need [GnuPG 2](https://www.gnupg.org) and [Skopeo](https://github.com/projectatomic/skopeo), and you will need to import
-the `Red Hat 3scale API Management Platform Signing Key` public key into your
-GnuPG keyring. Such key is available on the usual PGP servers.
-
-Please refer to the [GnuPG documentation](https://www.gnupg.org/documentation/index.html) for details about importing the key.
-
-You will also need to place the relevant `.signature` file from the release page in the main directory of the cloned repository.
-
-##### Verification
-
-You can verify the images if you so desire. For example, to verify
-`3scale/xcflushd:1.2.1-1`, you would run:
-
-> make TAG=1.2.1 DOCKER_REL=1 verify
 
 You could also specify a particular `KEY_ID` to check against.
 Run `make info` to get information about other variables.
