@@ -211,7 +211,12 @@ The command you want to run for verifying the Docker release 1 of v1.2.1 is:
 > make TAG=1.2.1 DOCKER_REL=1 verify-docker
 
 You could also specify a particular `KEY_ID` to check against.
-Run `make info` to get information about other variables.
+
+If you have a key file with name "<KEY_ID>.asc" in the project's root directory
+it can be imported into the keyring (provided it is not there already) by using
+the parameter `TRUST_KEY_FILE=1`.
+
+Run `make info` to get the current values of these and other variables.
 
 #### Signing The Easy Way
 
