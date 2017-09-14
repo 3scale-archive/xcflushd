@@ -24,6 +24,7 @@ KEY_ID ?= 0x1906BF9871FC70B4C3B1B33ADD8266DDCBFD2C6F
 KEY_FILE_NAME ?= $(KEY_ID).asc
 KEY_FILE_DIR ?= $(PROJECT_PATH)
 KEY_FILE = $(KEY_FILE_DIR)/$(KEY_FILE_NAME)
+TRUST_KEY_FILE ?= 0
 
 DOCKER_REL ?= 1
 DOCKER_VERSION = $(TAG)-$(DOCKER_REL)
@@ -47,9 +48,10 @@ DOCKER_VERIFY_RUN := $(DOCKER) run --rm --security-opt label:disable \
 	-v $(PROJECT_PATH):/opt/app -ti $(VERIFY_IMAGE)
 # Pass here all variables important for running the make instance inside Docker
 DOCKER_VERIFY_MAKE = $(DOCKER_VERIFY_RUN) make \
-		     TAG=$(TAG) DOCKER_REL=$(DOCKER_REL) \
-		     TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
-		     SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID)
+			TAG=$(TAG) DOCKER_REL=$(DOCKER_REL) \
+			TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
+			SIGNATURE=$(SIGNATURE) TRUST_KEY_FILE=$(TRUST_KEY_FILE) \
+			KEY_ID=$(KEY_ID)
 
 default: test
 
@@ -109,6 +111,7 @@ info:
 	"* KEY_ID = $(KEY_ID)\n" \
 	"* KEY_FILE_NAME = $(KEY_FILE_NAME)\n" \
 	"* KEY_FILE_DIR = $(KEY_FILE_DIR)\n" \
+	"* TRUST_KEY_FILE = $(TRUST_KEY_FILE)\n" \
 	"* TEST_CMD = $(TEST_CMD)\n"
 
 .PHONY: build
@@ -142,6 +145,7 @@ secret-key:
 
 .PHONY: public-key
 public-key:
+ifeq ($(TRUST_KEY_FILE),1)
 	if ! $(GPG) --list-keys $(KEY_ID); then \
 		if test -r $(KEY_FILE); then \
 		    $(MAKE) import-key; \
@@ -149,6 +153,11 @@ public-key:
 		    $(MAKE) fetch-key; \
 		fi; \
 	fi
+else
+	if ! $(GPG) --list-keys $(KEY_ID); then \
+		$(MAKE) fetch-key; \
+	fi
+endif
 
 .PHONY: sign
 sign: $(SIGNATURE)
