@@ -221,7 +221,7 @@ sign-docker: verify-image
 
 .PHONY: verify-docker
 verify-docker: verify-image
-	$(DOCKER_VERIFY_MAKE) fetch-key verify
+	$(DOCKER_VERIFY_MAKE) verify
 
 .PHONY: verify-image-shell
 verify-image-shell: verify-image
