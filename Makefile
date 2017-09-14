@@ -45,7 +45,8 @@ INFO_MARK = [II]
 WARN_MARK = [WW]
 
 DOCKER_VERIFY_RUN := $(DOCKER) run --rm --security-opt label:disable \
-	-v $(PROJECT_PATH):/opt/app -ti $(VERIFY_IMAGE)
+	-v $(PROJECT_PATH):/opt/app -v /var/run/docker.sock:/var/run/docker.sock \
+	-ti $(VERIFY_IMAGE)
 # Pass here all variables important for running the make instance inside Docker
 DOCKER_VERIFY_MAKE = $(DOCKER_VERIFY_RUN) make \
 			TAG=$(TAG) DOCKER_REL=$(DOCKER_REL) \
