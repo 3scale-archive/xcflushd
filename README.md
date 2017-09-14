@@ -174,8 +174,8 @@ To install gpg2 and skpeo on Red Hat Enterprise Linux (RHEL), use the following 
    * sudo yum install skopeo
 
 The `verify` target :
-* If an ASCII armored file $(KEY_ID).asc exists, then the keys are imported form this file into the PGP ring. The PGP keys are imported from the PGP servers only if the $(KEY_ID).asc files does not exist. $(KEY_ID) is the value of the PGP Key ID that was used in signing of the docker image.
-* Fetches PGP public keys associated with the KEY_ID into  from the PGP ring, iterates over them and uses skopeo tool to verify the authenticity of the image.
+* If an ASCII armored file $(KEY_ID).asc exists, then the keys are imported form this file into the PGP ring. The PGP keys are imported from the PGP key servers only if the $(KEY_ID).asc file does not exist. $(KEY_ID) is the value of the PGP Key ID that was used in signing of the docker image.
+* Fetches PGP public keys associated with the $(KEY_ID) from the PGP keyring, iterates over them and uses skopeo tool to verify the authenticity of the image.
 * Sucess/failure message is printed.
 
 ##### Makefile target: verify-docker
