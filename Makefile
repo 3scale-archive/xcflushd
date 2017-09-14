@@ -127,6 +127,12 @@ tag:
 push:
 	$(DOCKER) push $(TARGET_IMAGE)
 
+.PHONY: pull
+pull:
+	if ! $(DOCKER) history --quiet $(TARGET_IMAGE) 2> /dev/null >&2; then \
+		docker pull $(TARGET_IMAGE); \
+	fi
+
 $(MANIFEST):
 	$(SKOPEO) inspect --raw docker://$(TARGET_IMAGE) > $(MANIFEST)
 
