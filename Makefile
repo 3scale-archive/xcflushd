@@ -31,6 +31,7 @@ DOCKER_VERSION = $(TAG)-$(DOCKER_REL)
 DOCKER_BUILD_ARGS ?=
 LOCAL_IMAGE = $(PROJECT_NAME):$(DOCKER_VERSION)
 TARGET_IMAGE = $(REGISTRY)/$(REPOSITORY)/$(LOCAL_IMAGE)
+DOWNLOAD_IMAGE ?= 1
 
 MANIFEST ?= $(PROJECT_NAME)-image-$(DOCKER_VERSION).manifest
 SIGNATURE ?= $(PROJECT_NAME)-image-$(DOCKER_VERSION).signature
@@ -52,7 +53,7 @@ DOCKER_VERIFY_MAKE = $(DOCKER_VERIFY_RUN) make \
 			TAG=$(TAG) DOCKER_REL=$(DOCKER_REL) \
 			TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
 			SIGNATURE=$(SIGNATURE) TRUST_KEY_FILE=$(TRUST_KEY_FILE) \
-			KEY_ID=$(KEY_ID)
+			DOWNLOAD_IMAGE=$(DOWNLOAD_IMAGE) KEY_ID=$(KEY_ID)
 
 default: test
 
@@ -109,6 +110,7 @@ info:
 	"* DOCKER_BUILD_ARGS = $(DOCKER_BUILD_ARGS)\n" \
 	"* MANIFEST = $(MANIFEST)\n" \
 	"* SIGNATURE = $(SIGNATURE)\n" \
+	"* DOWNLOAD_IMAGE = $(DOWNLOAD_IMAGE)\n" \
 	"* KEY_ID = $(KEY_ID)\n" \
 	"* KEY_FILE_NAME = $(KEY_FILE_NAME)\n" \
 	"* KEY_FILE_DIR = $(KEY_FILE_DIR)\n" \
@@ -170,7 +172,11 @@ endif
 sign: $(SIGNATURE)
 
 .PHONY: verify
-verify: $(MANIFEST) public-key
+verify: public-key
+ifneq ($(DOWNLOAD_IMAGE),0)
+	$(MAKE) pull
+endif
+	$(MAKE) $(MANIFEST)
 	@if test "x$$(stat -c%s $(MANIFEST))" = "x0"; then \
 		echo "The manifest file $(MANIFEST) looks broken, please remove and retry" >&2 ; \
 		false ; \
