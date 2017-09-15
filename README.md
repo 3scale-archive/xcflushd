@@ -1,4 +1,4 @@
-# Xcflushd
+# xcflushd
 
 [![Build Status](https://travis-ci.org/3scale/xcflushd.svg?branch=master)](https://travis-ci.org/3scale/xcflushd) [![Code Climate](https://codeclimate.com/repos/585a6e7cd78de855e5002463/badges/7825d2a1491b30a172f7/gpa.svg)](https://codeclimate.com/repos/585a6e7cd78de855e5002463/feed)
 
@@ -190,13 +190,25 @@ instructions.
    * sudo yum install skopeo
 
 The `verify` target:
-* If an ASCII armored file $(KEY_ID).asc exists, then the keys are imported from
-this file into the PGP ring. The PGP keys are imported from the PGP key servers
-only if the $(KEY_ID).asc file does not exist. $(KEY_ID) is the value of the PGP
-Key ID that was used in signing of the docker image.
-* Fetches PGP public keys associated with the $(KEY_ID) from the PGP keyring,
-iterates over them and uses skopeo tool to verify the authenticity of the image.
-* Sucess/failure message is printed.
+* Checks the PGP keyring for the `KEY_ID` public key. If it is not stored there,
+  it will try to fetch it from the public PGP key servers, unless both an `.asc`
+  file with the name `<KEY_ID>.asc` exists and `make` was called with the
+  variable `TRUST_KEY_FILE=1`, in which case the process will try to import the
+  public key from the file. `KEY_ID` is the value of the PGP key ID that was
+  used in the signing of the docker image, and you can check its default value
+  by invoking `make info`.
+* Checks whether the image has been downloaded. If it has not been, then it
+  proceeds to download it. You can use the `make` variable `DOWNLOAD_IMAGE=0` to
+  skip downloading the image, but this is not recommended, as it will check the
+  image in Docker Hub but you can't be sure that what you download corresponds
+  to that. In other words, you might be vulnerable to a [TOCTOU](https://en.wikipedia.org/wiki/Time_of_check_to_time_of_use) attack.
+* Obtains a manifest file out of the image. Note that whether the image has been
+  downloaded or not, the process will generate the manifest anyway, that is, it
+  will connect to Docker Hub if the image is not located in the local registry.
+  Otherwise it will generate the manifest out of the local image.
+* The process iterates over the subkeys in `KEY_ID` and uses the `skopeo` tool
+  to verify the authenticity of the image against the manifest file.
+* A sucess or failure message is printed.
 
 ##### Makefile target: verify-docker
 
@@ -212,9 +224,12 @@ The command you want to run for verifying the Docker release 1 of v1.2.1 is:
 
 You could also specify a particular `KEY_ID` to check against.
 
-If you have a key file with name "<KEY_ID>.asc" in the project's root directory
+If you have a key file with name `<KEY_ID>.asc` in the project's root directory
 it can be imported into the keyring (provided it is not there already) by using
 the parameter `TRUST_KEY_FILE=1`.
+
+If you want to avoid downloading the image, use `DOWNLOAD=0`. This is strongly
+discouraged, please see above the information about the `verify` target.
 
 Run `make info` to get the current values of these and other variables.
 
