@@ -13,7 +13,7 @@ GPG ?= $(shell which gpg2 2> /dev/null)
 SKOPEO ?= $(shell which skopeo 2> /dev/null)
 CURL ?= $(shell which curl 2> /dev/null)
 DOCKER ?= $(shell which docker 2> /dev/null)
-TAG ?= $(shell git describe --dirty)
+TAG ?= $(shell git describe --dirty | sed -E -e "s/v([0-9]+.*)/\1/")
 
 REGISTRY ?= registry.hub.docker.com
 REPOSITORY ?= 3scale
@@ -24,12 +24,14 @@ KEY_ID ?= 0x1906BF9871FC70B4C3B1B33ADD8266DDCBFD2C6F
 KEY_FILE_NAME ?= $(KEY_ID).asc
 KEY_FILE_DIR ?= $(PROJECT_PATH)
 KEY_FILE = $(KEY_FILE_DIR)/$(KEY_FILE_NAME)
+TRUST_KEY_FILE ?= 0
 
 DOCKER_REL ?= 1
 DOCKER_VERSION = $(TAG)-$(DOCKER_REL)
 DOCKER_BUILD_ARGS ?=
 LOCAL_IMAGE = $(PROJECT_NAME):$(DOCKER_VERSION)
 TARGET_IMAGE = $(REGISTRY)/$(REPOSITORY)/$(LOCAL_IMAGE)
+DOWNLOAD_IMAGE ?= 1
 
 MANIFEST ?= $(PROJECT_NAME)-image-$(DOCKER_VERSION).manifest
 SIGNATURE ?= $(PROJECT_NAME)-image-$(DOCKER_VERSION).signature
@@ -44,12 +46,14 @@ INFO_MARK = [II]
 WARN_MARK = [WW]
 
 DOCKER_VERIFY_RUN := $(DOCKER) run --rm --security-opt label:disable \
-	-v $(PROJECT_PATH):/opt/app -ti $(VERIFY_IMAGE)
+	-v $(PROJECT_PATH):/opt/app -v /var/run/docker.sock:/var/run/docker.sock \
+	-ti $(VERIFY_IMAGE)
 # Pass here all variables important for running the make instance inside Docker
 DOCKER_VERIFY_MAKE = $(DOCKER_VERIFY_RUN) make \
-		     TAG=$(TAG) DOCKER_REL=$(DOCKER_REL) \
-		     TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
-		     SIGNATURE=$(SIGNATURE) KEY_ID=$(KEY_ID)
+			TAG=$(TAG) DOCKER_REL=$(DOCKER_REL) \
+			TARGET_IMAGE=$(TARGET_IMAGE) MANIFEST=$(MANIFEST) \
+			SIGNATURE=$(SIGNATURE) TRUST_KEY_FILE=$(TRUST_KEY_FILE) \
+			DOWNLOAD_IMAGE=$(DOWNLOAD_IMAGE) KEY_ID=$(KEY_ID)
 
 default: test
 
@@ -106,9 +110,11 @@ info:
 	"* DOCKER_BUILD_ARGS = $(DOCKER_BUILD_ARGS)\n" \
 	"* MANIFEST = $(MANIFEST)\n" \
 	"* SIGNATURE = $(SIGNATURE)\n" \
+	"* DOWNLOAD_IMAGE = $(DOWNLOAD_IMAGE)\n" \
 	"* KEY_ID = $(KEY_ID)\n" \
 	"* KEY_FILE_NAME = $(KEY_FILE_NAME)\n" \
 	"* KEY_FILE_DIR = $(KEY_FILE_DIR)\n" \
+	"* TRUST_KEY_FILE = $(TRUST_KEY_FILE)\n" \
 	"* TEST_CMD = $(TEST_CMD)\n"
 
 .PHONY: build
@@ -122,6 +128,12 @@ tag:
 .PHONY: push
 push:
 	$(DOCKER) push $(TARGET_IMAGE)
+
+.PHONY: pull
+pull:
+	if ! $(DOCKER) history --quiet $(TARGET_IMAGE) 2> /dev/null >&2; then \
+		docker pull $(TARGET_IMAGE); \
+	fi
 
 $(MANIFEST):
 	$(SKOPEO) inspect --raw docker://$(TARGET_IMAGE) > $(MANIFEST)
@@ -142,6 +154,7 @@ secret-key:
 
 .PHONY: public-key
 public-key:
+ifeq ($(TRUST_KEY_FILE),1)
 	if ! $(GPG) --list-keys $(KEY_ID); then \
 		if test -r $(KEY_FILE); then \
 		    $(MAKE) import-key; \
@@ -149,17 +162,34 @@ public-key:
 		    $(MAKE) fetch-key; \
 		fi; \
 	fi
+else
+	if ! $(GPG) --list-keys $(KEY_ID); then \
+		$(MAKE) fetch-key; \
+	fi
+endif
 
 .PHONY: sign
 sign: $(SIGNATURE)
 
 .PHONY: verify
-verify: $(MANIFEST) public-key
+verify: public-key
+ifneq ($(DOWNLOAD_IMAGE),0)
+	$(MAKE) pull
+endif
+	$(MAKE) $(MANIFEST)
+	@if test "x$$(stat -c%s $(MANIFEST))" = "x0"; then \
+		echo "The manifest file $(MANIFEST) looks broken, please remove and retry" >&2 ; \
+		false ; \
+	fi
 	@test -r $(SIGNATURE) || $(MAKE) info fetch-signature
+	@if test "x$$(stat -c%s $(SIGNATURE))" = "x0"; then \
+		echo "The signature file $(SIGNATURE) looks broken, please remove and retry" >&2 ; \
+		false ; \
+	fi
 	# Trying all subkeys
 	@OK=0; for k in $$($(GPG) --list-keys --with-fingerprint --with-fingerprint --with-colons $(KEY_ID) | grep "^fpr:" | cut -d: -f10); do \
 	    echo -n "Checking key $${k}... "; \
-	    if $(SKOPEO) standalone-verify $(MANIFEST) $(TARGET_IMAGE) $${k} $(SIGNATURE) 2> /dev/null; then \
+	    if $(SKOPEO) standalone-verify $(MANIFEST) $(TARGET_IMAGE) $${k} $(SIGNATURE) 2>> /tmp/skopeo-err; then \
 	        OK=1; \
 	        break; \
 	    else \
@@ -168,8 +198,12 @@ verify: $(MANIFEST) public-key
 	done; \
 	if test "x$${OK}" = "x1"; then \
 	    echo -e "\n$(BANNER_LINE)\n$(INFO_MARK) Signature verification OK\n$(BANNER_LINE)"; \
+		rm /tmp/skopeo-err; \
 	else \
 	    echo -e "\n$(BANNER_LINE)\n$(WARN_MARK) Signature verification FAILED\n$(BANNER_LINE)"; \
+		echo -e "\nError output:\n"; \
+		cat /tmp/skopeo-err; \
+		rm /tmp/skopeo-err; \
 	    false; \
 	fi
 
@@ -193,7 +227,7 @@ sign-docker: verify-image
 
 .PHONY: verify-docker
 verify-docker: verify-image
-	$(DOCKER_VERIFY_MAKE) fetch-key verify
+	$(DOCKER_VERIFY_MAKE) verify
 
 .PHONY: verify-image-shell
 verify-image-shell: verify-image
