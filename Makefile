@@ -18,9 +18,8 @@ TAG ?= $(shell git describe --dirty | sed -E -e "s/v([0-9]+.*)/\1/")
 REGISTRY ?= registry.hub.docker.com
 REPOSITORY ?= 3scale
 
-# Alex's key until a Red Hat 3scale API Management Platform Signing Key becomes
-# official.
-KEY_ID ?= 0x1906BF9871FC70B4C3B1B33ADD8266DDCBFD2C6F
+# Defaults to Red Hat 3scale Release Engineering Signing Key
+KEY_ID ?= 0x87B8012D69F7C46625E08BC92D4A2119B03C968E
 KEY_FILE_NAME ?= $(KEY_ID).asc
 KEY_FILE_DIR ?= $(PROJECT_PATH)
 KEY_FILE = $(KEY_FILE_DIR)/$(KEY_FILE_NAME)
